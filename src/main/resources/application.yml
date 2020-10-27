@@ -1,0 +1,16 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: Capacity Request
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    url: jdbc:postgresql://172.16.172.52:9982/postgres
+    continue-on-error: true
+    jpa:
+      show-sql: false
+      hibernate:
+        ddl-auto: update
