@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<solver xmlns="https://www.optaplanner.org/xsd/solver" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://www.optaplanner.org/xsd/solver https://www.optaplanner.org/xsd/solver/solver.xsd">
+
+  <!-- Domain model configuration -->
+  <solutionClass>tech.scalea.capacityRequest.model.CapacityRequestInfo</solutionClass>
+  <entityClass>tech.scalea.capacityRequest.model.VmModel</entityClass>
+
+  <!-- Score configuration -->
+  <scoreDirectorFactory>
+    <scoreDrl>cloudBalancingConstraints.drl</scoreDrl>
+    <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>
+  </scoreDirectorFactory>
+
+  <!-- Optimization algorithms configuration -->
+  <termination>
+    <bestScoreFeasible>true</bestScoreFeasible>
+    <secondsSpentLimit>30</secondsSpentLimit>
+  </termination>
+
+</solver>

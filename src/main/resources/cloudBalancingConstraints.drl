@@ -1,0 +1,82 @@
+dialect "java"
+
+import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScoreHolder;
+
+import tech.scalea.capacityRequest.model.ServerModel;
+import tech.scalea.capacityRequest.model.VmModel;
+import tech.scalea.capacityRequest.model.CapacityRequestInfo;
+
+global HardSoftScoreHolder scoreHolder;
+
+// ############################################################################
+// Hard constraints
+// ############################################################################
+
+rule "vcpuQtyTotal"
+    when
+        $serverModel : ServerModel($vCpuQuantity : vCpuQuantity)
+        accumulate(
+            VmModel(
+                serverModel == $serverModel,
+                 $vcpuQty : vcpuQty);
+            $vcpuQtyTotal : sum($vcpuQty);
+            $vcpuQtyTotal > $vCpuQuantity
+        )
+    then
+        scoreHolder.addHardConstraintMatch(kcontext, $vCpuQuantity - $vcpuQtyTotal);
+end
+
+rule "ramQtyTotal"
+    when
+        $serverModel : ServerModel($ramQuantity : ramQuantity)
+               accumulate(
+                   VmModel(
+               serverModel == $serverModel,
+                $ramQty : ramQty);
+            $ramQtyTotal : sum($ramQty);
+            $ramQtyTotal > $ramQuantity
+        )
+    then
+        scoreHolder.addHardConstraintMatch(kcontext, $ramQuantity - $ramQtyTotal);
+end
+
+
+//rule "requiredMemoryTotal"
+//    when
+//        $computer : CloudComputer($memory : memory)
+//        accumulate(
+//            CloudProcess(
+//                computer == $computer,
+//                $requiredMemory : requiredMemory);
+//            $requiredMemoryTotal : sum($requiredMemory);
+//            $requiredMemoryTotal > $memory
+//        )
+//    then
+//        scoreHolder.addHardConstraintMatch(kcontext, $memory - $requiredMemoryTotal);
+//end
+//
+//rule "requiredNetworkBandwidthTotal"
+//    when
+//        $computer : CloudComputer($networkBandwidth : networkBandwidth)
+//        accumulate(
+//            CloudProcess(
+//                computer == $computer,
+//                $requiredNetworkBandwidth : requiredNetworkBandwidth);
+//            $requiredNetworkBandwidthTotal : sum($requiredNetworkBandwidth);
+//            $requiredNetworkBandwidthTotal > $networkBandwidth
+//        )
+//    then
+//        scoreHolder.addHardConstraintMatch(kcontext, $networkBandwidth - $requiredNetworkBandwidthTotal);
+//end
+//
+//// ############################################################################
+//// Soft constraints
+//// ############################################################################
+//
+//rule "computerCost"
+//    when
+//        $computer : CloudComputer($cost : cost)
+//        exists CloudProcess(computer == $computer)
+//    then
+//        scoreHolder.addSoftConstraintMatch(kcontext, - $cost);
+//end
