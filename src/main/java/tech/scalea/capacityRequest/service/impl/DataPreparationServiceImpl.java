@@ -39,10 +39,25 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     public List<VmModel> getVmModelList(String dcId) {
         List<VmModel> vmModelList = new ArrayList<>();
         List<InvCapacityRequestItemEntity> entityList = capacityRequestItemRepository.findAllByDcId(dcId);
-        entityList.forEach(entity -> vmModelList.add(toVmModel(entity)));
+        for (InvCapacityRequestItemEntity entity : entityList) {
+            if (entity.getAntiAffinityGroup() == null || entity.getAntiAffinityGroup().isEmpty()) {
+                vmModelList.add(toVmModel(entity));
+            } else {
+                vmModelList.addAll(getSomeVmModels(entity));
+            }
+        }
         return vmModelList;
     }
 
+    private List<VmModel> getSomeVmModels(InvCapacityRequestItemEntity entity) {
+        List<VmModel> vmModelList = new ArrayList<>();
+        int vmQuantity = entity.getVmQty();
+        while (vmQuantity > 0) {
+            vmModelList.add(toVmModel(entity));
+            vmQuantity--;
+        }
+        return vmModelList;
+    }
 
     @Override
     public List<ServerModel> getServerModelList(String dcId) {
@@ -93,7 +108,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         return entity.getRamQty();
     }
 
-    public ServerModel toServerModel(ReportHostStatic entity){
+    public ServerModel toServerModel(ReportHostStatic entity) {
         ServerModel model = new ServerModel();
 
         model.setDcId(entity.getDcId());
@@ -101,13 +116,13 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         model.setHostIdLong(entity.getId());
         model.setHostName(entity.getHostName());
         model.setHostType(entity.getHostType().getStringValue());
-        if (entity.getTotalCpuQty() != null && entity.getAllocCpuQty() != null){
+        if (entity.getTotalCpuQty() != null && entity.getAllocCpuQty() != null) {
             model.setVCpuQuantity(entity.getTotalCpuQty() - entity.getAllocCpuQty());
         } else {
             logger.warn("Missing value TotalCpuQty or AllocCpuQty for {}", entity);
             model.setVCpuQuantity(0);
         }
-        if (entity.getTotalCpuQty() != null && entity.getAllocCpuQty() != null){
+        if (entity.getTotalCpuQty() != null && entity.getAllocCpuQty() != null) {
             model.setRamQuantity(entity.getTotalRamQty() - entity.getAllocRamQty().intValue());
         } else {
             logger.warn("Missing value TotalRamQty or AllocRamQty for {}", entity);
