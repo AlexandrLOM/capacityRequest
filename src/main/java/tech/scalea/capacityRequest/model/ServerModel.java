@@ -1,7 +1,6 @@
 package tech.scalea.capacityRequest.model;
 
 import lombok.Data;
-import tech.scalea.capacityRequest.enums.HostType;
 
 @Data
 public class ServerModel {
@@ -10,7 +9,7 @@ public class ServerModel {
     private String hostId;
     private String hostName;
     private String dcId;
-    private HostType hostType;
+    private String hostType;
     private Integer vCpuQuantity;
     private Integer ramQuantity;
     private Integer vmCount;

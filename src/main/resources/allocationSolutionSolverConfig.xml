@@ -3,19 +3,20 @@
     xsi:schemaLocation="https://www.optaplanner.org/xsd/solver https://www.optaplanner.org/xsd/solver/solver.xsd">
 
   <!-- Domain model configuration -->
-  <solutionClass>tech.scalea.capacityRequest.model.CapacityRequestInfo</solutionClass>
+  <solutionClass>tech.scalea.capacityRequest.model.AllocationSolution</solutionClass>
   <entityClass>tech.scalea.capacityRequest.model.VmModel</entityClass>
 
   <!-- Score configuration -->
   <scoreDirectorFactory>
-    <scoreDrl>cloudBalancingConstraints.drl</scoreDrl>
+    <scoreDrl>allocationSolutionConstraints.drl</scoreDrl>
     <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>
   </scoreDirectorFactory>
 
   <!-- Optimization algorithms configuration -->
   <termination>
     <bestScoreFeasible>true</bestScoreFeasible>
-    <secondsSpentLimit>30</secondsSpentLimit>
+    <secondsSpentLimit>10</secondsSpentLimit>
+    <!--  <minutesSpentLimit>2</minutesSpentLimit>-->
   </termination>
 
 </solver>

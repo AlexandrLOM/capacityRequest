@@ -1,0 +1,129 @@
+dialect "java"
+
+import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScoreHolder;
+
+import tech.scalea.capacityRequest.model.ServerModel;
+import tech.scalea.capacityRequest.model.VmModel;
+import tech.scalea.capacityRequest.model.AllocationSolution;
+
+global HardSoftScoreHolder scoreHolder;
+
+// ############################################################################
+// Hard constraints
+// ############################################################################
+
+ rule "dcIdConsitency"
+     when
+ 	   $serverModel : ServerModel($dcId : dcId)
+        VmModel(serverModel == $serverModel, dcId != $dcId)
+     then
+        scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+ end
+
+ rule "vcpuQtyTotal"
+    when
+        $serverModel : ServerModel($vCpuQuantity : vCpuQuantity)
+        accumulate(
+            VmModel(
+                serverModel == $serverModel,
+                 $vcpuQty : vcpuQty);
+            $vcpuQtyTotal : sum($vcpuQty);
+            $vcpuQtyTotal > $vCpuQuantity
+        )
+    then
+        scoreHolder.addHardConstraintMatch(kcontext, $vCpuQuantity - $vcpuQtyTotal);
+ end
+
+ rule "ramQtyTotal"
+    when
+        $serverModel : ServerModel($ramQuantity : ramQuantity)
+               accumulate(
+                   VmModel(
+               serverModel == $serverModel,
+                $ramQty : ramQty);
+            $ramQtyTotal : sum($ramQty);
+            $ramQtyTotal > $ramQuantity
+        )
+    then
+        scoreHolder.addHardConstraintMatch(kcontext, $ramQuantity - $ramQtyTotal);
+ end
+
+ rule "hostTypeConsitency"
+    when
+  	   $serverModel : ServerModel($hostType : hostType)
+         VmModel(serverModel == $serverModel, computeType != $hostType)
+    then
+         scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+ end
+
+ rule "antiAffinityGroupConflict"
+     when
+        VmModel($vmName : vmName, $serverModel : serverModel, $antiAffinityGroup : antiAffinityGroup)
+        VmModel(vmName != $vmName, serverModel == $serverModel, antiAffinityGroup == $antiAffinityGroup)
+     then
+        scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+ end
+
+ rule "dedicatedConsistency"
+     when
+        $serverModel : ServerModel(vmCount == 0)
+        VmModel($vmName : vmName, serverModel == $serverModel, dedicatedCompute == true)
+        VmModel(vmName != $vmName, serverModel == $serverModel)
+     then
+         scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+ end 
+
+
+// ############################################################################
+// Soft constraints
+// ############################################################################
+
+ rule "vCpuThreshold"
+     when
+         $serverModel : ServerModel($vCpuQuantity : vCpuQuantity)
+         accumulate(
+             VmModel(
+                 serverModel == $serverModel,
+                 $vcpuQty : vcpuQty);
+             $vcpuQtyTotal : sum($vcpuQty);
+             $vcpuQtyTotal > Math.round($vCpuQuantity*0.8)
+         )
+     then
+         scoreHolder.addSoftConstraintMatch(kcontext, (int)Math.round($vCpuQuantity*0.8) - $vcpuQtyTotal);
+ end
+
+ rule "ramThreshold"
+     when
+         $serverModel : ServerModel($ramQuantity : ramQuantity)
+         accumulate(
+             VmModel(
+                 serverModel == $serverModel,
+                 $ramQty : ramQty);
+             $ramQtyTotal : sum($ramQty);
+             $ramQtyTotal > Math.round($ramQuantity*0.8)
+         )
+     then
+         scoreHolder.addSoftConstraintMatch(kcontext, (int)Math.round($ramQuantity*0.8) - $ramQtyTotal);
+ end
+
+ rule "dedicatedCpuFit"
+    when
+       $serverModel : ServerModel($vCpuQuantity : vCpuQuantity, vmCount == 0)
+          VmModel(serverModel == $serverModel,
+           dedicatedCompute == true,
+           $vcpuQty : vcpuQty,
+           vcpuQty < Math.round($vCpuQuantity*0.8))
+    then
+       scoreHolder.addSoftConstraintMatch(kcontext, $vcpuQty - (int)Math.round($vCpuQuantity*0.8));
+ end
+
+ rule "dedicatedRamFit"
+     when
+        $serverModel : ServerModel($ramQuantity : ramQuantity, vmCount == 0)
+        VmModel(serverModel == $serverModel,
+        dedicatedCompute == true,
+        $ramQty : ramQty,
+        ramQty < Math.round($ramQuantity*0.8))
+     then
+         scoreHolder.addSoftConstraintMatch(kcontext, $ramQty - (int)Math.round($ramQuantity*0.8));
+ end

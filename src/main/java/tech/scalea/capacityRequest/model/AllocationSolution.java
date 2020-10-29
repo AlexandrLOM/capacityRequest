@@ -12,7 +12,7 @@ import java.util.List;
 
 @Data
 @PlanningSolution
-public class CapacityRequestInfo {
+public class AllocationSolution {
 
     private List<ServerModel> serverModelList;
 
@@ -22,10 +22,10 @@ public class CapacityRequestInfo {
 
     private long id;
 
-    public CapacityRequestInfo() {
+    public AllocationSolution() {
     }
 
-    public CapacityRequestInfo(long id, List<ServerModel> serverModelList, List<VmModel> vmModelList) {
+    public AllocationSolution(long id, List<ServerModel> serverModelList, List<VmModel> vmModelList) {
         this.id= id;
         this.serverModelList = serverModelList;
         this.vmModelList = vmModelList;

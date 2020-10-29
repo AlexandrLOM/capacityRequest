@@ -100,7 +100,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         model.setHostId(entity.getHostId());
         model.setHostIdLong(entity.getId());
         model.setHostName(entity.getHostName());
-        model.setHostType(entity.getHostType());
+        model.setHostType(entity.getHostType().getStringValue());
         if (entity.getTotalCpuQty() != null && entity.getAllocCpuQty() != null){
             model.setVCpuQuantity(entity.getTotalCpuQty() - entity.getAllocCpuQty());
         } else {
