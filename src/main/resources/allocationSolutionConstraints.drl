@@ -61,7 +61,7 @@ global HardSoftScoreHolder scoreHolder;
         VmModel($vmName : vmName, $serverModel : serverModel, $antiAffinityGroup : antiAffinityGroup)
         VmModel(vmName != $vmName, serverModel == $serverModel, antiAffinityGroup == $antiAffinityGroup)
      then
-        scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+        scoreHolder.addHardConstraintMatch(kcontext, - 10000);
  end
 
  rule "dedicatedConsistency"
@@ -70,7 +70,7 @@ global HardSoftScoreHolder scoreHolder;
         VmModel($vmName : vmName, serverModel == $serverModel, dedicatedCompute == true)
         VmModel(vmName != $vmName, serverModel == $serverModel)
      then
-         scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+         scoreHolder.addHardConstraintMatch(kcontext, - 100000);
  end 
 
 
@@ -93,18 +93,18 @@ global HardSoftScoreHolder scoreHolder;
  end
 
  rule "ramThreshold"
-     when
-         $serverModel : ServerModel($ramQuantity : ramQuantity)
-         accumulate(
-             VmModel(
-                 serverModel == $serverModel,
-                 $ramQty : ramQty);
-             $ramQtyTotal : sum($ramQty);
-             $ramQtyTotal > Math.round($ramQuantity*0.8)
-         )
-     then
-         scoreHolder.addSoftConstraintMatch(kcontext, (int)Math.round($ramQuantity*0.8) - $ramQtyTotal);
- end
+         when
+             $serverModel : ServerModel($ramQuantity : ramQuantity)
+             accumulate(
+                 VmModel(
+                     serverModel == $serverModel,
+                     $ramQty : ramQty);
+                 $ramQtyTotal : sum($ramQty);
+                 $ramQtyTotal > Math.round($ramQuantity*0.8)
+             )
+         then
+             scoreHolder.addSoftConstraintMatch(kcontext, (int)Math.round($ramQuantity*0.8) - $ramQtyTotal);
+     end
 
  rule "dedicatedCpuFit"
     when

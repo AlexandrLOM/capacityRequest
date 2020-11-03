@@ -1,6 +1,8 @@
 package tech.scalea.capacityRequest.service;
 
 import tech.scalea.capacityRequest.model.AllocationSolution;
+import tech.scalea.capacityRequest.model.CapacityRequest;
+import tech.scalea.capacityRequest.model.Result;
 import tech.scalea.capacityRequest.model.ServerModel;
 import tech.scalea.capacityRequest.model.VmModel;
 
@@ -10,5 +12,10 @@ public interface CapacityRequestService {
 
     AllocationSolution calculateCapacity(List<ServerModel> serverModelList, List<VmModel> vmModelList);
 
+    List<Result> analysisResults(AllocationSolution calculateCapacity);
+
+    List<CapacityRequest> capacityRequest();
+
+    List<Result> analysisResults(List<VmModel> vmModelList);
 
 }

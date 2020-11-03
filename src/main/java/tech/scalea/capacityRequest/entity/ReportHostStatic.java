@@ -36,9 +36,11 @@ public class ReportHostStatic implements Serializable {
     @Column(name = "dc_id")
     private String dcId;
 
-    @Column(name = "host_type")
-    @Enumerated(EnumType.STRING)
-    private HostType hostType;
+//    @Column(name = "host_type")
+//    @Enumerated(EnumType.STRING)
+//    private HostType hostType;
+
+    private String hostType;
 
     @Column(name = "host_vendor")
     @Enumerated(EnumType.STRING)

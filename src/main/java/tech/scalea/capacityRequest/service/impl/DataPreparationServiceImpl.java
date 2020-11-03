@@ -4,11 +4,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import tech.scalea.capacityRequest.entity.InvCapacityRequestEntity;
 import tech.scalea.capacityRequest.entity.InvCapacityRequestItemEntity;
 import tech.scalea.capacityRequest.entity.ReportHostStatic;
 import tech.scalea.capacityRequest.model.ServerModel;
 import tech.scalea.capacityRequest.model.VmModel;
 import tech.scalea.capacityRequest.repository.CapacityRequestItemRepository;
+import tech.scalea.capacityRequest.repository.CapacityRequestRepository;
 import tech.scalea.capacityRequest.repository.InvVmRepository;
 import tech.scalea.capacityRequest.repository.ReportHostStaticRepository;
 import tech.scalea.capacityRequest.service.DataPreparationService;
@@ -16,6 +18,7 @@ import tech.scalea.capacityRequest.service.DataPreparationService;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class DataPreparationServiceImpl implements DataPreparationService {
@@ -25,31 +28,49 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     private CapacityRequestItemRepository capacityRequestItemRepository;
     private ReportHostStaticRepository reportHostStaticRepository;
     private InvVmRepository invVmRepository;
+    private CapacityRequestRepository capacityRequestRepository;
 
     @Autowired
     public DataPreparationServiceImpl(CapacityRequestItemRepository capacityRequestItemRepository,
                                       ReportHostStaticRepository reportHostStaticRepository,
+                                      CapacityRequestRepository capacityRequestRepository,
                                       InvVmRepository invVmRepository) {
         this.capacityRequestItemRepository = capacityRequestItemRepository;
         this.reportHostStaticRepository = reportHostStaticRepository;
         this.invVmRepository = invVmRepository;
+        this.capacityRequestRepository = capacityRequestRepository;
+
     }
 
     @Override
-    public List<VmModel> getVmModelList(String dcId) {
+    public List<String> getDcIdListAllCapacityRequestItems() {
+        return capacityRequestItemRepository.findDcIdList();
+    }
+
+    @Override
+    public List<VmModel> getVmModelListByCapacityRequestId(UUID id) {
+        return toVmModelList(capacityRequestItemRepository.findAllByInvCapacityRequestEntity_Id(id));
+    }
+
+    @Override
+    public List<VmModel> getVmModelListByDcId(String dcId) {
+        return toVmModelList(capacityRequestItemRepository.findAllByDcId(dcId));
+    }
+
+    public List<VmModel> toVmModelList(List<InvCapacityRequestItemEntity> entityList) {
         List<VmModel> vmModelList = new ArrayList<>();
-        List<InvCapacityRequestItemEntity> entityList = capacityRequestItemRepository.findAllByDcId(dcId);
+
         for (InvCapacityRequestItemEntity entity : entityList) {
             if (entity.getAntiAffinityGroup() == null || entity.getAntiAffinityGroup().isEmpty()) {
                 vmModelList.add(toVmModel(entity));
             } else {
-                vmModelList.addAll(getSomeVmModels(entity));
+                vmModelList.addAll(getVmModelAntiAffinityGroup(entity));
             }
         }
         return vmModelList;
     }
 
-    private List<VmModel> getSomeVmModels(InvCapacityRequestItemEntity entity) {
+    private List<VmModel> getVmModelAntiAffinityGroup(InvCapacityRequestItemEntity entity) {
         List<VmModel> vmModelList = new ArrayList<>();
         int vmQuantity = entity.getVmQty();
         while (vmQuantity > 0) {
@@ -60,13 +81,31 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     }
 
     @Override
-    public List<ServerModel> getServerModelList(String dcId) {
-        List<ServerModel> serverModelList = new ArrayList<>();
+    public List<InvCapacityRequestEntity> getInvCapacityRequestEntityList(){
+        return capacityRequestRepository.findByOrderByDueDate();
+    }
 
+    @Override
+    public List<ServerModel> getServerModelListByDcIdAndComputeType(String dcId, String computeType) {
         Date lastDate = reportHostStaticRepository.findLastDateForDcId(dcId);
-        List<ReportHostStatic> entityList = reportHostStaticRepository.findAllByDcIdAndTimestamp(dcId, lastDate);
-        entityList.forEach(entity -> serverModelList.add(toServerModel(entity)));
+        return toServerModelList(reportHostStaticRepository.findAllByDcIdAndHostTypeAndTimestamp(dcId, computeType, lastDate));
+    }
 
+    @Override
+    public List<ServerModel> getServerModelListByDcId(String dcId) {
+        Date lastDate = reportHostStaticRepository.findLastDateForDcId(dcId);
+        return toServerModelList(reportHostStaticRepository.findAllByDcIdAndTimestamp(dcId, lastDate));
+    }
+
+    @Override
+    public List<ServerModel> getServerModelList() {
+        Date lastDate = reportHostStaticRepository.findLastDate();
+        return toServerModelList(reportHostStaticRepository.findAllByTimestamp(lastDate));
+    }
+
+    public List<ServerModel> toServerModelList(List<ReportHostStatic> entityList){
+        List<ServerModel> serverModelList = new ArrayList<>();
+        entityList.forEach(entity -> serverModelList.add(toServerModel(entity)));
         return serverModelList;
     }
 
@@ -78,6 +117,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         model.setVmName(entity.getVmName());
         model.setVmId(entity.getId());
         model.setAffinityGroup(entity.getAffinityGroup());
+        model.setAntiAffinityGroup(entity.getAntiAffinityGroup());
         model.setVcpuQty(countVcpuQty(entity));
         model.setRamQty(countRamQty(entity));
         model.setDedicatedCompute(entity.getDedicatedCompute() != null && entity.getDedicatedCompute().contains("YES"));
@@ -87,25 +127,21 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     }
 
     private int countVcpuQty(InvCapacityRequestItemEntity entity) {
-        if (entity.getAffinityGroup() != null && !entity.getAffinityGroup().isEmpty()) {
-            if (entity.getVmQty() != null) {
-                return entity.getVcpuQty() * entity.getVmQty();
-            } else {
-                logger.warn("Missing value VmQty for {}", entity);
-            }
+        if (entity.getAffinityGroup() == null || entity.getAffinityGroup().isEmpty()) {
+            return entity.getVcpuQty() == null ? 0 : entity.getVcpuQty();
+        } else {
+            return (entity.getVcpuQty() == null ? 0 : entity.getVcpuQty())
+                    * (entity.getVmQty() == null ? 0 : entity.getVmQty());
         }
-        return entity.getVcpuQty();
     }
 
     private int countRamQty(InvCapacityRequestItemEntity entity) {
-        if (entity.getAffinityGroup() != null && !entity.getAffinityGroup().isEmpty()) {
-            if (entity.getVmQty() != null) {
-                return entity.getRamQty() * entity.getVmQty();
-            } else {
-                logger.warn("Missing value ramQty for {}", entity);
-            }
+        if (entity.getAffinityGroup() == null || entity.getAffinityGroup().isEmpty()) {
+            return entity.getRamQty() == null ? 0 : entity.getRamQty();
+        } else {
+            return (entity.getRamQty() == null ? 0 : entity.getRamQty())
+                    * (entity.getVmQty() == null ? 0 : entity.getVmQty());
         }
-        return entity.getRamQty();
     }
 
     public ServerModel toServerModel(ReportHostStatic entity) {
@@ -115,7 +151,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         model.setHostId(entity.getHostId());
         model.setHostIdLong(entity.getId());
         model.setHostName(entity.getHostName());
-        model.setHostType(entity.getHostType().getStringValue());
+        model.setHostType(entity.getHostType());
         if (entity.getTotalCpuQty() != null && entity.getAllocCpuQty() != null) {
             model.setVCpuQuantity(entity.getTotalCpuQty() - entity.getAllocCpuQty());
         } else {
@@ -133,4 +169,6 @@ public class DataPreparationServiceImpl implements DataPreparationService {
 
         return model;
     }
+
+
 }

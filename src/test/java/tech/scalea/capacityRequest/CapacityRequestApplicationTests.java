@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import tech.scalea.capacityRequest.enums.HostType;
 import tech.scalea.capacityRequest.model.AllocationSolution;
+import tech.scalea.capacityRequest.model.Result;
 import tech.scalea.capacityRequest.model.ServerModel;
 import tech.scalea.capacityRequest.model.VmModel;
 import tech.scalea.capacityRequest.service.CapacityRequestService;
@@ -12,6 +13,7 @@ import tech.scalea.capacityRequest.service.DataPreparationService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @SpringBootTest
 class CapacityRequestApplicationTests {
@@ -27,20 +29,57 @@ class CapacityRequestApplicationTests {
     }
 
     @Test
-    void ran() {
+    void runByDc() {
         String dcId = "b630802c-c8d1-40f4-a38d-ecedb0209354";
 
         System.out.println("START");
 
-        AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(dataPreparationService.getServerModelList(dcId), dataPreparationService.getVmModelList(dcId));
+        AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(dataPreparationService.getServerModelListByDcId(dcId), dataPreparationService.getVmModelListByDcId(dcId));
         System.out.println(toDisplayString(allocationSolution));
 
         System.out.println("THE END");
     }
 
+    @Test
+    void runAllCapacityRequest() {
+
+        System.out.println("START");
+
+        List<String> dcIdList = dataPreparationService.getDcIdListAllCapacityRequestItems();
+        for (String dcId : dcIdList) {
+            System.out.println("---------------------------------------------------------");
+            try {
+                AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(dataPreparationService.getServerModelListByDcId(dcId), dataPreparationService.getVmModelListByDcId(dcId));
+                System.out.println(toDisplayString(allocationSolution));
+//                System.out.println("best score:");
+//                System.out.println("hard:" + allocationSolution.getScore().getHardScore());
+//                System.out.println("soft:" + allocationSolution.getScore().getSoftScore());
+            } catch (Exception e) {
+                System.out.println("ERROR");
+                System.out.println(e);
+            }
+
+            System.out.println("---------------------------------------------------------");
+        }
+
+        System.out.println("THE END");
+    }
 
     @Test
-    void ranMockData() {
+    void runByCapacityRequest() {
+        UUID requestId = UUID.fromString("34a1e31d-5172-49d7-977d-b341c0240514");
+
+        List<ServerModel> serverModelList = dataPreparationService.getServerModelList();
+        List<VmModel> vmModelList = dataPreparationService.getVmModelListByCapacityRequestId(requestId);
+
+        AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(serverModelList, vmModelList);
+        System.out.println(toDisplayString(allocationSolution));
+
+    }
+
+
+    @Test
+    void runMockData() {
 
         List<ServerModel> serverModelList = new ArrayList<>();
 
@@ -49,7 +88,7 @@ class CapacityRequestApplicationTests {
         serverModel1.setVCpuQuantity(20);
         serverModel1.setHostName("S-01");
         serverModel1.setHostType(HostType.Server.getStringValue());
-		serverModelList.add(serverModel1);
+        serverModelList.add(serverModel1);
 
         ServerModel serverModel2 = new ServerModel();
         serverModel2.setRamQuantity(20);
@@ -86,7 +125,7 @@ class CapacityRequestApplicationTests {
 
         VmModel vmMode2 = new VmModel();
         vmMode2.setVmName("vm-02");
-        vmMode2.setRamQty(5);
+        vmMode2.setRamQty(500);
         vmMode2.setVcpuQty(10);
         vmMode2.setComputeType(HostType.Server.getStringValue());
         vmMode2.setAntiAffinityGroup("AntiAff-01");
@@ -115,7 +154,7 @@ class CapacityRequestApplicationTests {
         vmMode5.setVmName("vm-04");
         vmMode5.setRamQty(1);
         vmMode5.setVcpuQty(3);
-        vmMode5.setComputeType(HostType.DCGW.getStringValue());
+        vmMode5.setComputeType(HostType.Leaf.getStringValue());
         vmMode5.setAntiAffinityGroup("AntiAff-05");
         vmMode5.setDedicatedCompute(false);
         vmModelList.add(vmMode5);
@@ -124,14 +163,29 @@ class CapacityRequestApplicationTests {
 
         AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(serverModelList, vmModelList);
         System.out.println(toDisplayString(allocationSolution));
+        List<Result> resultList = capacityRequestService.analysisResults(allocationSolution);
+        for(Result result : resultList){
+            System.out.println(result.getServerModel().getHostName());
+            System.out.println("CPU - " + result.getVcpuQty());
+            System.out.println("RAM - " + result.getRamQty());
+            System.out.println("VM - " + result.getVmModelList().size());
+        }
+
 
         System.out.println("THE END");
+    }
+
+    @Test
+    public void capacityRequest(){
+        System.out.println(capacityRequestService.capacityRequest());
     }
 
 
     public static String toDisplayString(AllocationSolution allocationSolution) {
         StringBuilder displayString = new StringBuilder();
-
+        System.out.println("best score:");
+        System.out.println("            hard:" + allocationSolution.getScore().getHardScore());
+        System.out.println("            soft:" + allocationSolution.getScore().getSoftScore());
         if (allocationSolution.getScore().isFeasible()) {
             for (VmModel process : allocationSolution.getVmModelList()) {
                 ServerModel computer = process.getServerModel();
@@ -145,3 +199,4 @@ class CapacityRequestApplicationTests {
         return displayString.toString();
     }
 }
+

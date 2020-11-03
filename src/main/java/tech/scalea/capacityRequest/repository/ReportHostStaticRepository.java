@@ -13,9 +13,17 @@ public interface ReportHostStaticRepository extends JpaRepository<ReportHostStat
 
     List<ReportHostStatic> findAllByDcIdAndTimestamp(String dcId, Date timestamp);
 
+    List<ReportHostStatic> findAllByDcIdAndHostTypeAndTimestamp(String dcId, String computeType, Date timestamp);
+
+    List<ReportHostStatic> findAllByTimestamp(Date timestamp);
+
     @Query(value = "select max(timestamp) from report_host_static where dc_id = :dcId",
             nativeQuery = true)
     Date findLastDateForDcId(String dcId);
+
+    @Query(value = "select max(timestamp) from report_host_static",
+            nativeQuery = true)
+    Date findLastDate();
 
 
 }

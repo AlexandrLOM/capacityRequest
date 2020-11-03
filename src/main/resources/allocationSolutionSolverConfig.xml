@@ -15,7 +15,7 @@
   <!-- Optimization algorithms configuration -->
   <termination>
     <bestScoreFeasible>true</bestScoreFeasible>
-    <secondsSpentLimit>10</secondsSpentLimit>
+    <secondsSpentLimit>5</secondsSpentLimit>
     <!--  <minutesSpentLimit>2</minutesSpentLimit>-->
   </termination>
 
