@@ -13,6 +13,7 @@ public class CapacityRequest {
     List<InvCapacityRequestEntity> invCapacityRequestEntityList;
     List<Result> resultList;
     Integer solverHard;
+    List<ServerModel> newServers;
 //    List<Result> incompatibleVmAntiAffinityGroup;
 //    List<Result> incompatibleVmDedicatedComputeList;
 }

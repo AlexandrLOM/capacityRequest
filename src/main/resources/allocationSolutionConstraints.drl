@@ -78,7 +78,7 @@ global HardSoftScoreHolder scoreHolder;
         $serverModel : ServerModel(vmCount > 0)
         VmModel($vmName : vmName, serverModel == $serverModel, dedicatedCompute == true)
       then
-         scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+         scoreHolder.addHardConstraintMatch(kcontext, - 10000);
   end
 
 

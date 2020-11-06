@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @SpringBootTest
 class CapacityRequestApplicationTests {
@@ -185,74 +184,118 @@ class CapacityRequestApplicationTests {
     public void capacityRequest() {
         List<CapacityRequest> capacityRequestList = capacityRequestService.capacityRequest(new ArrayList<>());
         showResult(capacityRequestList);
-        capacityRequestService.calculateRequiredNumberOfServers(capacityRequestList);
+//        capacityRequestList = capacityRequestService.calculateRequiredNumberOfServers(capacityRequestList);
+//        for (CapacityRequest capacityRequest : capacityRequestList) {
+//            if (capacityRequest.getNewServers() != null) capacityRequest.getNewServers().forEach(System.out::println);
+//        }
+
+//        while (capacityRequestList.stream().mapToInt(CapacityRequest::getSolverHard).sum() != 0){
+//        capacityRequestList = capacityRequestService.capacityRequest(capacityRequestList);
+//        showResult(capacityRequestList);
+//        capacityRequestList = capacityRequestService.calculateRequiredNumberOfServers(capacityRequestList);
+//        for (CapacityRequest capacityRequest : capacityRequestList) {
+//            if (capacityRequest.getNewServers() != null) capacityRequest.getNewServers().forEach(System.out::println);
+//        }
+//        capacityRequestList = capacityRequestService.capacityRequest(capacityRequestList);
+//       }
+
+//        showResult(capacityRequestList);
+//        capacityRequestList = capacityRequestService.calculateRequiredNumberOfServers(capacityRequestList);
+//        for (CapacityRequest capacityRequest : capacityRequestList) {
+//            if (capacityRequest.getNewServers() != null) capacityRequest.getNewServers().forEach(System.out::println);
+//        }
+//        capacityRequestList = capacityRequestService.capacityRequest(capacityRequestList);
+//        showResult(capacityRequestList);
+        System.out.println("THE END!");
 
     }
 
-public void showResult(List<CapacityRequest> capacityRequestList){
-    for (CapacityRequest capacityRequest : capacityRequestList) {
-        System.out.println("-----------------------------------------------------------------------");
-        System.out.println("Due date - " + capacityRequest.getDueDate());
-        System.out.println("Capacity requests:");
+    public void showResult(List<CapacityRequest> capacityRequestList) {
+        for (CapacityRequest capacityRequest : capacityRequestList) {
+            System.out.println("-----------------------------------------------------------------------");
+            System.out.println("Due date - " + capacityRequest.getDueDate());
+            System.out.println("Capacity requests:");
+            for(InvCapacityRequestEntity invCapacityRequestEntity : capacityRequest.getInvCapacityRequestEntityList()){
+                System.out.println("ID: " + invCapacityRequestEntity.getId() + ", name:" + invCapacityRequestEntity.getRequestName());
 
-        Set<String> dcIdSet = capacityRequest.getResultList().stream().map(result -> result.getServerModel().getDcId()).collect(Collectors.toSet());
-        for (String dcId : dcIdSet) {
-            List<Result> resultListByDcId = capacityRequest.getResultList().stream().filter(result -> dcId.equals(result.getServerModel().getDcId())).collect(Collectors.toList());
-            Set<String> typeSet = resultListByDcId.stream().map(result -> result.getServerModel().getHostType()).collect(Collectors.toSet());
-            for (String type : typeSet) {
-                int serversNew = 0;
-                List<Result> resultListByDcIdAndType = resultListByDcId.stream().filter(result -> type.equals(result.getServerModel().getHostType())).collect(Collectors.toList());
-                System.out.println("");
-                System.out.println("Got allocationSolution for DC_id: " + dcId + ", host_type: " + type);
-                int vmsAag = 0;
-                for (Result result : resultListByDcIdAndType) {
-                    vmsAag = vmsAag + result.getVmModelList().size() + result.getIncompatibleVmAntiAffinityGroup().size() + result.getIncompatibleVmDedicatedComputeList().size();
-                }
-                System.out.println("HOSTs: " + resultListByDcIdAndType.size()
-                        + ", VMs " + vmsAag);
-                int cpu = resultListByDcIdAndType.stream().filter(result -> result.getVcpuQty() < 0).mapToInt(Result::getVcpuQty).sum();
-                if (cpu < 0) System.out.println("Total Capacity Exceeding, vCPU: " + cpu);
-                int ram = resultListByDcIdAndType.stream().filter(result -> result.getRamQty() < 0).mapToInt(Result::getRamQty).sum();
-                if (ram < 0) System.out.println("Total Capacity Exceeding, RAM: " + ram);
-                for (Result result : resultListByDcIdAndType) {
-                    int cpu1 = 0;
-                    int ram1 = 0;
-                    if (result.getVcpuQty() < 0) cpu1 = result.getVcpuQty();
-                    if (result.getRamQty() < 0) ram1 = result.getRamQty();
-                    if (cpu1 < 0 || ram1 < 0) {
-                        System.out.println("Host id: " + result.getServerModel().getHostIdLong() + ", Capacity Exceeding, vCPU: " + cpu1 + ", RAM: " + ram1);
-                    }
-                }
-                int df = resultListByDcIdAndType.stream().mapToInt(result -> result.getIncompatibleVmDedicatedComputeList().size()).sum();
-                System.out.println("Dedicated category: " + df);
-                for (Result result : resultListByDcIdAndType) {
-                    for (VmModel vmModel : result.getIncompatibleVmDedicatedComputeList()) {
-                        System.out.println("mv id: " + vmModel.getVmId() + ", vCPU: " + vmModel.getVcpuQty() + ", RAM: " + vmModel.getRamQty());
-                    }
-                }
-                System.out.println("Anti-Affinity category:");
-                Set<String> groupSet = new HashSet<>();
-                for (Result result : resultListByDcIdAndType) {
-                    groupSet.addAll(result.getIncompatibleVmAntiAffinityGroup().stream().map(VmModel::getAntiAffinityGroup).collect(Collectors.toSet()));
-                }
-                for (String group : groupSet) {
-                    int vms = 0;
-                    int vmAll = 0;
-                    for (Result result : resultListByDcIdAndType) {
-                        vms = vms + (int) result.getIncompatibleVmAntiAffinityGroup().stream().filter(vmModel -> group.equals(vmModel.getAntiAffinityGroup())).count();
-                        vmAll = vmAll + (int) result.getVmModelList().stream().filter(vmModel -> group.equals(vmModel.getAntiAffinityGroup())).count();
-                    }
-                    vmAll = vmAll + vms;
-                    System.out.println("Name: " + group + ", VMs " + vms + " from " + vmAll);
-                    if (serversNew < vms) serversNew = vms;
-                }
-                serversNew = serversNew + df;
-                System.out.println("Estimated servers count: " + serversNew);
             }
 
+            Set<String> dcIdSet = capacityRequest.getResultList().stream().map(result -> result.getServerModel().getDcId()).collect(Collectors.toSet());
+            for (String dcId : dcIdSet) {
+                List<Result> resultListByDcId = capacityRequest.getResultList().stream().filter(result -> dcId.equals(result.getServerModel().getDcId())).collect(Collectors.toList());
+                Set<String> typeSet = resultListByDcId.stream().map(result -> result.getServerModel().getHostType()).collect(Collectors.toSet());
+                for (String type : typeSet) {
+                    int serversNew = 0;
+                    List<Result> resultListByDcIdAndType = resultListByDcId.stream().filter(result -> type.equals(result.getServerModel().getHostType())).collect(Collectors.toList());
+                    System.out.println("");
+                    System.out.println("Got allocationSolution for DC_id: " + dcId + ", host_type: " + type);
+                    int vmsAag = 0;
+                    for (Result result : resultListByDcIdAndType) {
+                        vmsAag = vmsAag + result.getVmModelList().size() + result.getIncompatibleVmAntiAffinityGroup().size() + result.getIncompatibleVmDedicatedComputeList().size();
+                    }
+                    System.out.println("HOSTs: " + resultListByDcIdAndType.size()
+                            + ", VMs " + vmsAag);
+                    int cpu = resultListByDcIdAndType.stream().filter(result -> result.getVcpuQty() < 0).mapToInt(Result::getVcpuQty).sum();
+                    if (cpu < 0) System.out.println("Total Capacity Exceeding, vCPU: " + cpu);
+                    int ram = resultListByDcIdAndType.stream().filter(result -> result.getRamQty() < 0).mapToInt(Result::getRamQty).sum();
+                    if (ram < 0) System.out.println("Total Capacity Exceeding, RAM: " + ram);
+                    for (Result result : resultListByDcIdAndType) {
+                        int cpu1 = 0;
+                        int ram1 = 0;
+                        if (result.getVcpuQty() < 0) cpu1 = result.getVcpuQty();
+                        if (result.getRamQty() < 0) ram1 = result.getRamQty();
+                        if (cpu1 < 0 || ram1 < 0) {
+                            //System.out.println("Host id: " + result.getServerModel().getHostIdLong() + ", Capacity Exceeding, vCPU: " + cpu1 + ", RAM: " + ram1);
+                        }
+                    }
+                    int df = resultListByDcIdAndType.stream().mapToInt(result -> result.getIncompatibleVmDedicatedComputeList().size()).sum();
+                    System.out.println("Dedicated category: " + df);
+                    for (Result result : resultListByDcIdAndType) {
+                        for (VmModel vmModel : result.getIncompatibleVmDedicatedComputeList()) {
+                            //System.out.println("mv id: " + vmModel.getVmId() + ", vCPU: " + vmModel.getVcpuQty() + ", RAM: " + vmModel.getRamQty());
+                            //System.out.println("mv id: " + vmModel.getVmId() + ", vCPU: " + vmModel.getVcpuQty() + ", RAM: " + vmModel.getRamQty());
+                        }
+                    }
+                    System.out.println("Anti-Affinity category:");
+                    Set<String> groupSet = new HashSet<>();
+                    for (Result result : resultListByDcIdAndType) {
+                        groupSet.addAll(result.getIncompatibleVmAntiAffinityGroup().stream().map(VmModel::getAntiAffinityGroup).collect(Collectors.toSet()));
+                    }
+                    for (String group : groupSet) {
+                        int vms = 0;
+                        int vmAll = 0;
+                        for (Result result : resultListByDcIdAndType) {
+                            vms = vms + (int) result.getIncompatibleVmAntiAffinityGroup().stream().filter(vmModel -> group.equals(vmModel.getAntiAffinityGroup())).count();
+                            vmAll = vmAll + (int) result.getVmModelList().stream().filter(vmModel -> group.equals(vmModel.getAntiAffinityGroup())).count();
+                        }
+                        vmAll = vmAll + vms;
+                        System.out.println("Name: " + group + ", VMs: " + vms);
+                        //System.out.println("Name: " + group + ", VMs " + vms + " from " + vmAll);
+                        if (serversNew < vms) serversNew = vms;
+
+                    }
+                    serversNew = serversNew + df;
+                    if(serversNew == 0){
+                        double cpuNew = 0;
+                        double ramNew = 0;
+
+                        if("SR_IOV".equals(type)){
+                            cpuNew = 68;
+                            ramNew = 256;
+                        } else if ("DPDK".equals(type)){
+                            cpuNew = 56;
+                            ramNew = 256;
+                        }
+
+                        serversNew = (int)Math.ceil(Double.max(Math.abs(cpu)/cpuNew, Math.abs(ram)/ramNew));
+                    }
+
+                    System.out.println("Estimated servers count: " + serversNew);
+                }
+
+            }
         }
     }
-}
 
     public static String toDisplayString(AllocationSolution allocationSolution) {
         StringBuilder displayString = new StringBuilder();

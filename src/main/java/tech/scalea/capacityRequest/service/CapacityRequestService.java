@@ -5,6 +5,7 @@ import tech.scalea.capacityRequest.model.CapacityRequest;
 import tech.scalea.capacityRequest.model.Result;
 import tech.scalea.capacityRequest.model.ServerModel;
 import tech.scalea.capacityRequest.model.VmModel;
+import tech.scalea.capacityRequest.model.requst.Request;
 
 import java.util.List;
 

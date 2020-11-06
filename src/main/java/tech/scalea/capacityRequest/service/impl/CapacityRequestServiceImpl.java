@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -173,7 +174,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
     }
 
     @Override
-    public List<CapacityRequest> capacityRequest(List<CapacityRequest> newCapacityRequest) {
+    public List<CapacityRequest> capacityRequest(List<CapacityRequest> newCapacityRequestList) {
         List<CapacityRequest> capacityRequestsList = new ArrayList<>();
 
         List<InvCapacityRequestEntity> invCapacityRequestEntityList = dataPreparationService.getInvCapacityRequestEntityList();
@@ -216,6 +217,14 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
                         resultList.addAll(analysisResults(vmModelList));
                         continue;
                     }
+
+                    if (!newCapacityRequestList.isEmpty()) {
+                        if (capacityRequest.getNewServers() == null) capacityRequest.setNewServers(new ArrayList<>());
+                        capacityRequest.getNewServers().addAll(getNewServerModel(newCapacityRequestList, dueDate, dcId, computeType));
+
+                        serverModelList.addAll(capacityRequest.getNewServers());
+                    }
+
                     AllocationSolution allocationSolution = calculateCapacity(serverModelList, vmModelListByDcIdAndComputeType);
                     resultList.addAll(analysisResults(allocationSolution));
                     capacityRequest.setSolverHard(capacityRequest.getSolverHard() + allocationSolution.getScore().getHardScore());
@@ -235,7 +244,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         List<CapacityRequest> newCapacityRequestList = new ArrayList<>();
 
         for (CapacityRequest capacityRequest : capacityRequestList) {
-            if (capacityRequest.getSolverHard() == 0) continue;
+            //if (capacityRequest.getSolverHard() == 0) continue;
 
             CapacityRequest newCapacityRequest = new CapacityRequest();
             newCapacityRequest.setDueDate(capacityRequest.getDueDate());
@@ -253,6 +262,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
                     serverModel.setHostType(type);
                     serverModel.setVCpuQuantity(resultListByDcIdAndType.stream().filter(result -> 0 > result.getVcpuQty()).mapToInt(Result::getVcpuQty).sum());
                     serverModel.setRamQuantity(resultListByDcIdAndType.stream().filter(result -> 0 > result.getRamQty()).mapToInt(Result::getRamQty).sum());
+                    serverModel.setVmCount(0);
                     Result resultNew = new Result();
                     resultNew.setServerModel(serverModel);
                     resultNew.setIncompatibleVmDedicatedComputeList(new ArrayList<>());
@@ -296,15 +306,15 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
                                     type,
                                     Math.abs(result.getServerModel().getVCpuQuantity()),
                                     Math.abs(result.getServerModel().getRamQuantity())
-                                    ));
+                            ));
                         } else {
-
+                            newServerModelList.addAll(getServerModel(dcId,
+                                    type,
+                                    serv));
                         }
-
                     }
                 }
             }
-
         }
 
         return newServerModelList;
@@ -330,6 +340,8 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
             serverModel.setHostType(type);
             serverModel.setVCpuQuantity(cpuServ);
             serverModel.setRamQuantity(ramServ);
+            serverModel.setVmCount(0);
+            serverModel.setHostId(UUID.randomUUID().toString());
             serverModelList.add(serverModel);
 
         }
@@ -356,6 +368,8 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
             serverModel.setHostType(type);
             serverModel.setVCpuQuantity(cpuServ);
             serverModel.setRamQuantity(ramServ);
+            serverModel.setVmCount(0);
+            serverModel.setHostId(UUID.randomUUID().toString());
             serverModelList.add(serverModel);
 
         }
