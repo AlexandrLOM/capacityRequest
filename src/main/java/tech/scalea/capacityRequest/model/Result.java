@@ -12,5 +12,6 @@ public class Result {
     private Integer vcpuQty;
     private Integer ramQty;
     private List<VmModel> incompatibleVmAntiAffinityGroup;
+    private List<VmModel> incompatibleVmDedicatedComputeList;
 
 }

@@ -14,8 +14,10 @@ public interface CapacityRequestService {
 
     List<Result> analysisResults(AllocationSolution calculateCapacity);
 
-    List<CapacityRequest> capacityRequest();
+    List<CapacityRequest> capacityRequest(List<CapacityRequest> newCapacityRequest);
 
     List<Result> analysisResults(List<VmModel> vmModelList);
+
+    List<CapacityRequest> calculateRequiredNumberOfServers(List<CapacityRequest> capacityRequestList);
 
 }

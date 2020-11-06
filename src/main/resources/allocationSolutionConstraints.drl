@@ -71,7 +71,15 @@ global HardSoftScoreHolder scoreHolder;
         VmModel(vmName != $vmName, serverModel == $serverModel)
      then
          scoreHolder.addHardConstraintMatch(kcontext, - 100000);
- end 
+ end
+
+ rule "dedicatedConsistency2"
+      when
+        $serverModel : ServerModel(vmCount > 0)
+        VmModel($vmName : vmName, serverModel == $serverModel, dedicatedCompute == true)
+      then
+         scoreHolder.addHardConstraintMatch(kcontext, - 1000);
+  end
 
 
 // ############################################################################

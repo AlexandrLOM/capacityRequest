@@ -10,6 +10,9 @@ import java.util.List;
 public class CapacityRequest {
 
     public Date dueDate;
-    //List<InvCapacityRequestEntity> invCapacityRequestEntityList;
+    List<InvCapacityRequestEntity> invCapacityRequestEntityList;
     List<Result> resultList;
+    Integer solverHard;
+//    List<Result> incompatibleVmAntiAffinityGroup;
+//    List<Result> incompatibleVmDedicatedComputeList;
 }

@@ -61,16 +61,16 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         List<VmModel> vmModelList = new ArrayList<>();
 
         for (InvCapacityRequestItemEntity entity : entityList) {
-            if (entity.getAntiAffinityGroup() == null || entity.getAntiAffinityGroup().isEmpty()) {
+            if(entity.getAffinityGroup() != null && !entity.getAffinityGroup().isEmpty()){
                 vmModelList.add(toVmModel(entity));
             } else {
-                vmModelList.addAll(getVmModelAntiAffinityGroup(entity));
+                vmModelList.addAll(getVmModelGroup(entity));
             }
         }
         return vmModelList;
     }
 
-    private List<VmModel> getVmModelAntiAffinityGroup(InvCapacityRequestItemEntity entity) {
+    private List<VmModel> getVmModelGroup(InvCapacityRequestItemEntity entity) {
         List<VmModel> vmModelList = new ArrayList<>();
         int vmQuantity = entity.getVmQty();
         while (vmQuantity > 0) {
@@ -127,11 +127,21 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     }
 
     private int countVcpuQty(InvCapacityRequestItemEntity entity) {
-        if (entity.getAffinityGroup() == null || entity.getAffinityGroup().isEmpty()) {
-            return entity.getVcpuQty() == null ? 0 : entity.getVcpuQty();
+        if (entity.getAffinityGroup() != null && !entity.getAffinityGroup().isEmpty()) {
+            if(entity.getVcpuQty() == null){
+                logger.warn("Missing value vCPU for {}", entity);
+                return 0;
+            } if(entity.getVmQty() == null){
+                logger.warn("Missing value quantity VMs for {}", entity);
+                return entity.getVmQty();
+            }
+            return entity.getVcpuQty() * entity.getVmQty();
         } else {
-            return (entity.getVcpuQty() == null ? 0 : entity.getVcpuQty())
-                    * (entity.getVmQty() == null ? 0 : entity.getVmQty());
+            if(entity.getVcpuQty() == null){
+                logger.warn("Missing value vCPU for {}", entity);
+                return 0;
+            }
+            return  entity.getVcpuQty();
         }
     }
 
