@@ -10,6 +10,9 @@ import tech.scalea.capacityRequest.model.CapacityRequest;
 import tech.scalea.capacityRequest.model.Result;
 import tech.scalea.capacityRequest.model.ServerModel;
 import tech.scalea.capacityRequest.model.VmModel;
+import tech.scalea.capacityRequest.model.response.Alert;
+import tech.scalea.capacityRequest.model.response.Response;
+import tech.scalea.capacityRequest.model.response.ServerInfo;
 import tech.scalea.capacityRequest.service.CapacityRequestService;
 import tech.scalea.capacityRequest.service.DataPreparationService;
 
@@ -21,7 +24,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @SpringBootTest
-class CapacityRequestApplicationTests {
+class CapacityResponseApplicationTests {
 
     @Autowired
     private DataPreparationService dataPreparationService;
@@ -34,12 +37,31 @@ class CapacityRequestApplicationTests {
     }
 
     @Test
+    void startCapacityCalculationByCapacityRequestIdTest(){
+        //UUID id = UUID.fromString("34a1e31d-5172-49d7-977d-b341c0240513");
+        UUID id = UUID.fromString("34a1e31d-5172-49d7-977d-b341c0240514");
+        Response response = capacityRequestService.startCapacityCalculationByCapacityRequestId(id);
+        System.out.println(response.getDueDate());
+        for (InvCapacityRequestEntity invCapacityRequestEntity : response.getInvCapacityRequestEntityList()){
+            System.out.println(invCapacityRequestEntity.getId());
+        }
+        for(ServerInfo serverInfo : response.getSererList()){
+            System.out.println(serverInfo);
+        }
+        System.out.println("Alerts:");
+        List<Alert> alertList = capacityRequestService.getAlertList(response);
+        for(Alert alert : alertList){
+            System.out.println(alert);
+        }
+    }
+
+    @Test
     void runByDc() {
         String dcId = "b630802c-c8d1-40f4-a38d-ecedb0209354";
 
         System.out.println("START");
 
-        AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(dataPreparationService.getServerModelListByDcId(dcId), dataPreparationService.getVmModelListByDcId(dcId));
+        AllocationSolution allocationSolution = capacityRequestService.startSolution(dataPreparationService.getServerModelListByDcId(dcId), dataPreparationService.getVmModelListByDcId(dcId));
         System.out.println(toDisplayString(allocationSolution));
 
         System.out.println("THE END");
@@ -54,7 +76,7 @@ class CapacityRequestApplicationTests {
         for (String dcId : dcIdList) {
             System.out.println("---------------------------------------------------------");
             try {
-                AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(dataPreparationService.getServerModelListByDcId(dcId), dataPreparationService.getVmModelListByDcId(dcId));
+                AllocationSolution allocationSolution = capacityRequestService.startSolution(dataPreparationService.getServerModelListByDcId(dcId), dataPreparationService.getVmModelListByDcId(dcId));
                 System.out.println(toDisplayString(allocationSolution));
 //                System.out.println("best score:");
 //                System.out.println("hard:" + allocationSolution.getScore().getHardScore());
@@ -77,7 +99,7 @@ class CapacityRequestApplicationTests {
         List<ServerModel> serverModelList = dataPreparationService.getServerModelList();
         List<VmModel> vmModelList = dataPreparationService.getVmModelListByCapacityRequestId(requestId);
 
-        AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(serverModelList, vmModelList);
+        AllocationSolution allocationSolution = capacityRequestService.startSolution(serverModelList, vmModelList);
         System.out.println(toDisplayString(allocationSolution));
 
     }
@@ -166,7 +188,7 @@ class CapacityRequestApplicationTests {
 
         System.out.println("START");
 
-        AllocationSolution allocationSolution = capacityRequestService.calculateCapacity(serverModelList, vmModelList);
+        AllocationSolution allocationSolution = capacityRequestService.startSolution(serverModelList, vmModelList);
         System.out.println(toDisplayString(allocationSolution));
         List<Result> resultList = capacityRequestService.analysisResults(allocationSolution);
         for (Result result : resultList) {
@@ -228,12 +250,13 @@ class CapacityRequestApplicationTests {
                     int serversNew = 0;
                     List<Result> resultListByDcIdAndType = resultListByDcId.stream().filter(result -> type.equals(result.getServerModel().getHostType())).collect(Collectors.toList());
                     System.out.println("");
-                    System.out.println("Got allocationSolution for DC_id: " + dcId + ", host_type: " + type);
+                    //System.out.println("Got allocationSolution for DC_id: " + dcId + ", type: " + type);
                     int vmsAag = 0;
                     for (Result result : resultListByDcIdAndType) {
                         vmsAag = vmsAag + result.getVmModelList().size() + result.getIncompatibleVmAntiAffinityGroup().size() + result.getIncompatibleVmDedicatedComputeList().size();
                     }
-                    System.out.println("HOSTs: " + resultListByDcIdAndType.size()
+                    System.out.println("Got allocationSolution for DC_id: " + dcId + ", type: " + type
+                            + ", HOSTs: " + resultListByDcIdAndType.size()
                             + ", VMs " + vmsAag);
                     int cpu = resultListByDcIdAndType.stream().filter(result -> result.getVcpuQty() < 0).mapToInt(Result::getVcpuQty).sum();
                     if (cpu < 0) System.out.println("Total Capacity Exceeding, vCPU: " + cpu);

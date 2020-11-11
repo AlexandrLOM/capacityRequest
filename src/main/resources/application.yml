@@ -22,3 +22,9 @@ optaplanner:
       spent-limit: 5s
   solver-config-xml: allocationSolutionSolverConfig.xml
 
+logging:
+  level:
+    tech.scalea.capacityRequest.service: debug
+
+app:
+  capacityReserve: 0.8

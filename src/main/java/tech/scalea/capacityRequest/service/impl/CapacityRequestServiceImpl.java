@@ -1,28 +1,40 @@
 package tech.scalea.capacityRequest.service.impl;
 
+import org.optaplanner.core.api.score.constraint.ConstraintMatchTotal;
+import org.optaplanner.core.api.score.constraint.Indictment;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.api.solver.SolverFactory;
+import org.optaplanner.core.impl.score.director.ScoreDirector;
+import org.optaplanner.core.impl.score.director.ScoreDirectorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tech.scalea.capacityRequest.entity.InvCapacityRequestEntity;
 import tech.scalea.capacityRequest.model.AllocationSolution;
+import tech.scalea.capacityRequest.model.CalculationData;
 import tech.scalea.capacityRequest.model.CapacityRequest;
 import tech.scalea.capacityRequest.model.Result;
 import tech.scalea.capacityRequest.model.ServerModel;
 import tech.scalea.capacityRequest.model.VmModel;
+import tech.scalea.capacityRequest.model.response.Alert;
+import tech.scalea.capacityRequest.model.response.Response;
+import tech.scalea.capacityRequest.model.response.ServerInfo;
 import tech.scalea.capacityRequest.service.CapacityRequestService;
 import tech.scalea.capacityRequest.service.DataPreparationService;
 
+import javax.xml.crypto.Data;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class CapacityRequestServiceImpl implements CapacityRequestService {
@@ -37,7 +49,170 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
     }
 
     @Override
-    public AllocationSolution calculateCapacity(List<ServerModel> serverModelList, List<VmModel> vmModelList) {
+    public Response startCapacityCalculationByCapacityRequestId(UUID id) {
+        Response response = new Response();
+        response.setSererList(new ArrayList<>());
+
+        CalculationData calculationData = dataPreparationService.getVmModelListByCapacityRequestIdAndAllVMsBefore(id);
+        logger.info("Capacity request Id [{}], All VMs [{}]", id, calculationData.getVmModelList().size());
+        response.setDueDate(calculationData.getDueDate());
+        response.setCapacityRequest(id);
+        response.setInvCapacityRequestEntityList(calculationData.getInvCapacityRequestEntityList());
+
+        Set<String> dcIdSet = calculationData.getVmModelList().stream().map(VmModel::getDcId).collect(Collectors.toSet());
+        for (String dcId : dcIdSet) {
+            if (dcId == null) {
+                logger.warn("For some VMs DcId is not specified. Skip them...");
+                continue;
+            }
+            List<VmModel> vmModelListByDcId = calculationData.getVmModelList().stream()
+                    .filter(vmModel -> dcId.equals(vmModel.getDcId()))
+                    .collect(Collectors.toList());
+            Set<String> typeSet = vmModelListByDcId.stream().map(VmModel::getComputeType).collect(Collectors.toSet());
+
+            for (String type : typeSet) {
+                if (type == null) {
+                    logger.warn("For some VMs type is not specified. Skip them...");
+                    continue;
+                }
+
+                List<VmModel> vmModelListByDcIdAndType = vmModelListByDcId.stream()
+                        .filter(vmModel -> type.equals(vmModel.getComputeType()))
+                        .collect(Collectors.toList());
+                List<ServerModel> serverModelList = dataPreparationService.getServerModelListByDcIdAndComputeType(dcId, type);
+                logger.info("Got allocationSolution for DC_id: {}, type: {}, HOSTs: {}, VMs: {}",
+                        dcId, type, serverModelList.size(), vmModelListByDcIdAndType.size());
+
+                response.getSererList().add(getResourceShortageInformation(serverModelList, vmModelListByDcIdAndType, dcId, type));
+            }
+        }
+        return response;
+    }
+
+    private ServerInfo getResourceShortageInformation(List<ServerModel> serverModelList, List<VmModel> vmModelList, String dcId, String type) {
+        ServerInfo serverInfo = dataPreparationService.getServerInfo(type);
+        serverInfo.setDcId(dcId);
+        serverInfo.setDedicatedExceededQuantity(0);
+        serverInfo.setCapacityExceededQuantity(0);
+        int numberOfServers = 0;
+
+        AllocationSolution allocationSolution = startSolution(serverModelList, vmModelList);
+        int hardScore = allocationSolution.getScore().getHardScore();
+
+        List<ServerModel> newServerModelList = new ArrayList<>();
+        newServerModelList.addAll(serverModelList);
+
+        while (hardScore != 0) {
+            if (newServerModelList.size() + serverModelList.size() > vmModelList.size()) {
+                throw new RuntimeException("No solution for input data!" +
+                        "\n" + newServerModelList +
+                        "\n" + vmModelList);
+            }
+
+
+            serverInfo = analysisAllocationSolution(allocationSolution,
+                    serverInfo);
+            numberOfServers = serverInfo.getCapacityExceededQuantity() + serverInfo.getDedicatedExceededQuantity();
+            logger.debug("Estimated servers count: {}", numberOfServers);
+
+            List<ServerModel> newServes = getNewServerModelList(serverInfo, numberOfServers);
+            newServerModelList.addAll(newServes);
+
+            allocationSolution = startSolution(newServerModelList, vmModelList);
+            hardScore = allocationSolution.getScore().getHardScore();
+
+
+        }
+        //serverInfo.setQuantity(numberOfServers);
+        logger.debug("Final. Estimated servers count: {}", numberOfServers);
+        return serverInfo;
+    }
+
+    private List<ServerModel> getNewServerModelList(ServerInfo serverInfo, Integer numberOfServers) {
+        List<ServerModel> serverModelList = new ArrayList<>();
+        int i = numberOfServers;
+        while (i > 0) {
+            String id = UUID.randomUUID().toString();
+            ServerModel serverModel = new ServerModel();
+            serverModel.setDcId(serverInfo.getDcId());
+            serverModel.setHostName(id);
+            serverModel.setHostId(id);
+            serverModel.setVmCount(0);
+            serverModel.setHostType(serverInfo.getType());
+            serverModel.setVCpuQuantity(serverInfo.getVCpu());
+            serverModel.setRamQuantity(serverInfo.getRam());
+            serverModelList.add(serverModel);
+
+            i--;
+        }
+
+        return serverModelList;
+    }
+
+    private ServerInfo analysisAllocationSolution(AllocationSolution allocationSolution, ServerInfo serverInfo) {
+        List<VmModel> resultVmList = new ArrayList<>();
+        resultVmList.addAll(allocationSolution.getVmModelList());
+
+        List<VmModel> violatorsAntiAffinityGroup = getViolatorsAntiAffinityGroup(resultVmList);
+        List<VmModel> violatorsDedicatedCompute = getViolatorsDedicatedCompute(resultVmList);
+
+        violatorsAntiAffinityGroup.forEach(resultVmList::remove);
+        violatorsDedicatedCompute.forEach(resultVmList::remove);
+
+        int serversNumberByVcpuOrRam = calculateRequiredNumberOfServers(resultVmList,
+                serverInfo.getVCpu(),
+                serverInfo.getRam());
+
+        int serversNumberByDedicatedCompute = violatorsDedicatedCompute.size();
+
+        int serversNumberByAntiAffinityGroup = violatorsAntiAffinityGroup.size();
+
+        logger.debug("vCPU or RAM category: {}, Dedicated category: {}, Anti-Affinity category: {}",
+                serversNumberByVcpuOrRam, serversNumberByDedicatedCompute, serversNumberByAntiAffinityGroup);
+
+        serverInfo.setCapacityExceededQuantity(serverInfo.getCapacityExceededQuantity()
+                + Integer.max(serversNumberByVcpuOrRam, serversNumberByAntiAffinityGroup));
+
+        serverInfo.setDedicatedExceededQuantity(serverInfo.getDedicatedExceededQuantity()
+                + serversNumberByDedicatedCompute);
+
+        return serverInfo;
+
+    }
+
+    private int calculateRequiredNumberOfServersForAntiAffinityGroup(List<Result> resultList) {
+        int quantity = 0;
+        List<VmModel> vmModelList = new ArrayList<>();
+        resultList.forEach(result -> vmModelList.addAll(result.getIncompatibleVmAntiAffinityGroup()));
+        Set<String> aagNameSet = vmModelList.stream().map(VmModel::getAntiAffinityGroup).collect(Collectors.toSet());
+        for (String aagName : aagNameSet) {
+
+            quantity = Integer.max(quantity, (int) vmModelList.stream().filter(vmModel -> aagName.equals(vmModel.getAntiAffinityGroup())).count());
+        }
+        return quantity;
+    }
+
+    private int calculateRequiredNumberOfServers(List<VmModel> resultList, Integer vCpu, Integer ram) {
+        int allVCpu = 0;
+        int allRam = 0;
+        Set<ServerModel> serverModelSet = resultList.stream().map(VmModel::getServerModel).collect(Collectors.toSet());
+        for(ServerModel serverModel : serverModelSet){
+            int cpuServer =  serverModel.getVCpuQuantity() - resultList.stream().filter(vmModel -> serverModel.equals(vmModel.getServerModel())).mapToInt(VmModel::getVcpuQty).sum();
+            allVCpu = allVCpu + (cpuServer < 0 ? cpuServer : 0);
+            int ramServer =  serverModel.getRamQuantity() - resultList.stream().filter(vmModel -> serverModel.equals(vmModel.getServerModel())).mapToInt(VmModel::getRamQty).sum();
+            allRam = allRam + (ramServer < 0 ? ramServer : 0);
+
+        }
+        logger.info("Total Capacity Exceeding, vCPU: {}, RAM: {}", allVCpu, allRam);
+        return (int) Math.ceil(Double.max(Math.abs(allVCpu) / (double) vCpu, Math.abs(allRam) / (double) ram));
+    }
+
+    @Override
+    public AllocationSolution startSolution(List<ServerModel> serverModelList, List<VmModel> vmModelList) {
+
+        logger.debug("Servers: {}, VMs: {}",
+                serverModelList.size(),
+                vmModelList.size());
 
         // Build the Solver
         SolverFactory<AllocationSolution> solverFactory = SolverFactory.createFromXmlResource("allocationSolutionSolverConfig.xml");
@@ -81,11 +256,17 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
     }
 
     public CapacityRequest checkAntiAffinityGroup(CapacityRequest capacityRequest) {
+        logger.debug("Check AntiAffinity Group:");
         for (Result result : capacityRequest.getResultList()) {
+            logger.debug("DcId: [{}], type [{}], Host: [{}]",
+                    result.getServerModel().getDcId(),
+                    result.getServerModel().getHostType(),
+                    result.getServerModel().getHostIdLong());
             Set<String> nameAntiAffinityGroupSet = result.getVmModelList().stream().map(VmModel::getAntiAffinityGroup).collect(Collectors.toSet());
             for (String name : nameAntiAffinityGroupSet) {
                 if (name == null) continue;
                 List<VmModel> vmModelList = result.getVmModelList().stream().filter(vmModel -> name.equals(vmModel.getAntiAffinityGroup())).collect(Collectors.toList());
+                logger.debug("Name: [{}], VMs: {}", name, vmModelList.size());
                 while (vmModelList.size() > 1) {
                     VmModel vmModel = vmModelList.stream().findAny().get();
                     result.getVmModelList().remove(vmModel);
@@ -98,6 +279,64 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         }
         return capacityRequest;
     }
+
+    public List<VmModel> getViolatorsAntiAffinityGroup(List<VmModel> vmModelList) {
+        logger.debug("Check AntiAffinity Group..");
+        List<VmModel> violators = new ArrayList<>();
+        Set<String> nameAntiAffinityGroupSet = vmModelList.stream()
+                .map(VmModel::getAntiAffinityGroup)
+                .collect(Collectors.toSet());
+        for (String name : nameAntiAffinityGroupSet) {
+            if (name == null) continue;
+
+            List<VmModel> vmModelsAag = vmModelList.stream().filter(vmModel -> name.equals(vmModel.getAntiAffinityGroup())).collect(Collectors.toList());
+            Set<ServerModel> serverModelSet = vmModelsAag.stream().map(VmModel::getServerModel).collect(Collectors.toSet());
+            for (ServerModel serverModel : serverModelSet) {
+                List<VmModel> vmModelListByAagAndServer = vmModelsAag.stream().filter(vmModel -> serverModel.equals(vmModel.getServerModel())).collect(Collectors.toList());
+                if (vmModelListByAagAndServer.size() > 1) {
+                    violators.addAll(vmModelListByAagAndServer);
+                    violators.remove(vmModelListByAagAndServer.stream().findFirst().get());
+                }
+            }
+        }
+        return violators;
+    }
+
+    @Override
+    public List<Alert> getAlertList(Response response){
+        List<Alert> alertList = new ArrayList<>();
+        for(ServerInfo serverInfo : response.getSererList()){
+            if (serverInfo.getCapacityExceededQuantity() > 0 ){
+                alertList.add(creatAlert(serverInfo.getType(),
+                        "Capacity Exceeded",
+                        response.getCapacityRequest(),
+                        response.getDueDate(),
+                        serverInfo.getDcId(),
+                        serverInfo.getCapacityExceededQuantity()));
+            }
+            if (serverInfo.getDedicatedExceededQuantity() > 0 ){
+                alertList.add(creatAlert(serverInfo.getType(),
+                        "Dedicated Exceeded",
+                        response.getCapacityRequest(),
+                        response.getDueDate(),
+                        serverInfo.getDcId(),
+                        serverInfo.getDedicatedExceededQuantity()));
+            }
+        }
+        return alertList;
+    }
+
+    public Alert creatAlert(String hostType, String category, UUID capacityRequestId, Date dueDate, String dcId, int hostCount){
+        Alert alert = new Alert();
+        alert.setCategory(category);
+        alert.setCapacityRequestId(capacityRequestId);
+        alert.setDueDate(dueDate);
+        alert.setDcid(dcId);
+        alert.setHostType(hostType);
+        alert.setHostCount(hostCount);
+        return alert;
+    }
+
 
 //    public List<VmModel> addVmInVmModelList(List<VmModel> vmModelList, List<VmModel> resultList) {
 //        for (VmModel vmModel : vmModelList) {
@@ -133,8 +372,14 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
 //    }
 
     public CapacityRequest checkDedicatedCompute(CapacityRequest capacityRequest) {
+        logger.debug("Check Dedicated Compute:");
         for (Result result : capacityRequest.getResultList()) {
+            logger.debug("DcId: [{}], type [{}], Host: [{}]",
+                    result.getServerModel().getDcId(),
+                    result.getServerModel().getHostType(),
+                    result.getServerModel().getHostIdLong());
             List<VmModel> dedicatedVmList = result.getVmModelList().stream().filter(VmModel::isDedicatedCompute).collect(Collectors.toList());
+            logger.debug("VMs: [{}] , {}", dedicatedVmList.size(), dedicatedVmList);
             if (dedicatedVmList.isEmpty()
                     || dedicatedVmList.size() == 1 && capacityRequest.getResultList().size() == 1) {
                 continue;
@@ -162,6 +407,23 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         return capacityRequest;
     }
 
+    public List<VmModel> getViolatorsDedicatedCompute(List<VmModel> resultList) {
+        logger.info("Check Dedicated Compute..");
+            List<VmModel> dedicatedVmList = resultList.stream().filter(VmModel::isDedicatedCompute).collect(Collectors.toList());
+        List<VmModel> violators = new ArrayList<>();
+            Set<ServerModel> serverModelSet = dedicatedVmList.stream().map(VmModel::getServerModel).collect(Collectors.toSet());
+            for (ServerModel serverModel : serverModelSet) {
+                List<VmModel> vms = dedicatedVmList.stream().filter(vmModel -> serverModel.equals(vmModel.getServerModel())).collect(Collectors.toList());
+                if(serverModel.getVmCount() == 0 && vms.size() > 1){
+                    violators.addAll(vms);
+                    violators.remove(vms.stream().findFirst().get());
+                } else  if (serverModel.getVmCount() != 0 && vms.size() > 1){
+                    violators.addAll(vms);
+                }
+            }
+            return violators;
+    }
+
     @Override
     public List<Result> analysisResults(List<VmModel> vmModelList) {
         List<Result> results = new ArrayList<>();
@@ -181,6 +443,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         Set<Date> dueDateSet = invCapacityRequestEntityList.stream().map(InvCapacityRequestEntity::getDueDate).collect(Collectors.toSet());
         List<InvCapacityRequestEntity> invCapacityRequestEntities = new ArrayList<>();
         for (Date dueDate : dueDateSet) {
+            logger.debug("dueDate: [{}]", dueDate);
             CapacityRequest capacityRequest = new CapacityRequest();
             capacityRequest.setDueDate(dueDate);
             invCapacityRequestEntities.addAll(invCapacityRequestEntityList.stream().filter(invCapacityRequestEntity -> invCapacityRequestEntity.getDueDate().equals(dueDate)).collect(Collectors.toList()));
@@ -204,6 +467,9 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
 
                 Set<String> computeTypeSet = vmModelListByDcId.stream().map(VmModel::getComputeType).collect(Collectors.toSet());
                 for (String computeType : computeTypeSet) {
+                    logger.debug("dc id: [{}], compute type: [{}]",
+                            dcId,
+                            computeType);
                     if (computeType == null) {
                         logger.warn("Compute type not set for some VMs. [{}]", computeType);
                         continue;
@@ -225,7 +491,8 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
                         serverModelList.addAll(capacityRequest.getNewServers());
                     }
 
-                    AllocationSolution allocationSolution = calculateCapacity(serverModelList, vmModelListByDcIdAndComputeType);
+                    AllocationSolution allocationSolution = startSolution(serverModelList, vmModelListByDcIdAndComputeType);
+                    logger.debug("solver: {}", allocationSolution.getVmModelList());
                     resultList.addAll(analysisResults(allocationSolution));
                     capacityRequest.setSolverHard(capacityRequest.getSolverHard() + allocationSolution.getScore().getHardScore());
                 }
