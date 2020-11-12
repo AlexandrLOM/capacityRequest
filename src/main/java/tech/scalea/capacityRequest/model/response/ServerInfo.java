@@ -11,4 +11,7 @@ public class ServerInfo {
     private Integer ram;
     private Integer dedicatedExceededQuantity;
     private Integer capacityExceededQuantity;
+    private String descriptionDedicatedGroups;
+    private String descriptionAntiAffinityGroups;
+    private String descriptionCpuRam;
 }

@@ -15,13 +15,13 @@ public interface CapacityRequestService {
 
     AllocationSolution startSolution(List<ServerModel> serverModelList, List<VmModel> vmModelList);
 
-    List<Result> analysisResults(AllocationSolution calculateCapacity);
+//    List<Result> analysisResults(AllocationSolution calculateCapacity);
 
-    List<CapacityRequest> capacityRequest(List<CapacityRequest> newCapacityRequest);
+//    List<CapacityRequest> capacityRequest(List<CapacityRequest> newCapacityRequest);
 
-    List<Result> analysisResults(List<VmModel> vmModelList);
+//    List<Result> analysisResults(List<VmModel> vmModelList);
 
-    List<CapacityRequest> calculateRequiredNumberOfServers(List<CapacityRequest> capacityRequestList);
+//    List<CapacityRequest> calculateRequiredNumberOfServers(List<CapacityRequest> capacityRequestList);
 
     Response startCapacityCalculationByCapacityRequestId(UUID id);
 

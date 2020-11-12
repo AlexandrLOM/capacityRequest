@@ -14,4 +14,5 @@ public class Alert {
     private String dcid;
     private String hostType;
     private Integer hostCount;
+    private String description;
 }
