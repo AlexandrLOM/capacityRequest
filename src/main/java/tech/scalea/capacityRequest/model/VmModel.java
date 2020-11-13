@@ -20,6 +20,7 @@ public class VmModel {
     private String affinityGroup;
     private Integer vcpuQty;
     private Integer ramQty;
+    private Integer storageQty;
     private boolean dedicatedCompute;
 
     // Planning variables: changes during planning, between score calculations.

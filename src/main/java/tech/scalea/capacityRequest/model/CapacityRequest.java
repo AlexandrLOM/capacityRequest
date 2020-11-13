@@ -9,11 +9,11 @@ import java.util.List;
 @Data
 public class CapacityRequest {
 
-    public Date dueDate;
-    List<InvCapacityRequestEntity> invCapacityRequestEntityList;
-    List<Result> resultList;
-    Integer solverHard;
-    List<ServerModel> newServers;
+//    public Date dueDate;
+//    List<InvCapacityRequestEntity> invCapacityRequestEntityList;
+//    List<Result> resultList;
+//    Integer solverHard;
+//    List<ServerModel> newServers;
 //    List<Result> incompatibleVmAntiAffinityGroup;
 //    List<Result> incompatibleVmDedicatedComputeList;
 }

@@ -7,7 +7,7 @@ import java.util.List;
 @Data
 public class CapacityRequestModel {
 
-    private List<ServerModel> serverModelList;
-    private List<VmModel> vmModelList;
+//    private List<ServerModel> serverModelList;
+//    private List<VmModel> vmModelList;
 
 }

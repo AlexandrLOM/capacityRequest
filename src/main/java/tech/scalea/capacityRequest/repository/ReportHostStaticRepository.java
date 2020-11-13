@@ -11,11 +11,7 @@ import java.util.List;
 @Repository
 public interface ReportHostStaticRepository extends JpaRepository<ReportHostStatic, Long> {
 
-    List<ReportHostStatic> findAllByDcIdAndTimestamp(String dcId, Date timestamp);
-
     List<ReportHostStatic> findAllByDcIdAndHostTypeAndTimestamp(String dcId, String computeType, Date timestamp);
-
-    List<ReportHostStatic> findAllByTimestamp(Date timestamp);
 
     @Query(value = "select max(timestamp) from report_host_static where dc_id = :dcId",
             nativeQuery = true)

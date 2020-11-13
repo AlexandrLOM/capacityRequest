@@ -7,11 +7,11 @@ import java.util.List;
 @Data
 public class Result {
 
-    private ServerModel serverModel;
-    private List<VmModel> vmModelList;
-    private Integer vcpuQty;
-    private Integer ramQty;
-    private List<VmModel> incompatibleVmAntiAffinityGroup;
-    private List<VmModel> incompatibleVmDedicatedComputeList;
+//    private ServerModel serverModel;
+//    private List<VmModel> vmModelList;
+//    private Integer vcpuQty;
+//    private Integer ramQty;
+//    private List<VmModel> incompatibleVmAntiAffinityGroup;
+//    private List<VmModel> incompatibleVmDedicatedComputeList;
 
 }

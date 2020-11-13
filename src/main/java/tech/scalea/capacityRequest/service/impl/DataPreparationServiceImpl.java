@@ -9,6 +9,7 @@ import tech.scalea.capacityRequest.entity.InvCapacityRequestEntity;
 import tech.scalea.capacityRequest.entity.InvCapacityRequestItemEntity;
 import tech.scalea.capacityRequest.entity.InvExpansionRequestItemEntity;
 import tech.scalea.capacityRequest.entity.ReportHostStatic;
+import tech.scalea.capacityRequest.entity.ReportStorageStatic;
 import tech.scalea.capacityRequest.entity.THostEntity;
 import tech.scalea.capacityRequest.model.CalculationData;
 import tech.scalea.capacityRequest.model.ServerModel;
@@ -19,6 +20,7 @@ import tech.scalea.capacityRequest.repository.CapacityRequestRepository;
 import tech.scalea.capacityRequest.repository.ExpansionRequestItemRepository;
 import tech.scalea.capacityRequest.repository.InvVmRepository;
 import tech.scalea.capacityRequest.repository.ReportHostStaticRepository;
+import tech.scalea.capacityRequest.repository.ReportStorageStaticRepository;
 import tech.scalea.capacityRequest.repository.THostRepository;
 import tech.scalea.capacityRequest.service.DataPreparationService;
 
@@ -45,6 +47,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     private CapacityRequestRepository capacityRequestRepository;
     private THostRepository tHostRepository;
     private ExpansionRequestItemRepository expansionRequestItemRepository;
+    private ReportStorageStaticRepository reportStorageStaticRepository;
 
     @Autowired
     public DataPreparationServiceImpl(CapacityRequestItemRepository capacityRequestItemRepository,
@@ -52,12 +55,14 @@ public class DataPreparationServiceImpl implements DataPreparationService {
                                       CapacityRequestRepository capacityRequestRepository,
                                       THostRepository tHostRepository,
                                       ExpansionRequestItemRepository expansionRequestItemRepository,
+                                      ReportStorageStaticRepository reportStorageStaticRepository,
                                       InvVmRepository invVmRepository) {
         this.capacityRequestItemRepository = capacityRequestItemRepository;
         this.reportHostStaticRepository = reportHostStaticRepository;
         this.invVmRepository = invVmRepository;
         this.capacityRequestRepository = capacityRequestRepository;
         this.expansionRequestItemRepository = expansionRequestItemRepository;
+        this.reportStorageStaticRepository = reportStorageStaticRepository;
         this.tHostRepository = tHostRepository;
 
     }
@@ -125,26 +130,28 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     }
 
     @Override
-    public ServerInfo getServerInfo(String type) {
+    public ServerInfo getServerInfoFromTemplate(String type) {
         ServerInfo serverInfo = new ServerInfo();
 //        Optional<THostEntity> entityOptional = tHostRepository.findByHostType(type);
         List<THostEntity> tHostEntities = tHostRepository.findAllByHostType(type);
         Optional<THostEntity> entityOptional = tHostEntities.stream().findFirst();
         if (entityOptional.isPresent()) {
             serverInfo.setType(type);
-            serverInfo.setVCpu((int) Math.round(entityOptional.get().getCpuQty() * capacityReserve));
-            serverInfo.setRam((int) Math.round(entityOptional.get().getRamCapacity() * capacityReserve));
+            serverInfo.setVCpu((int) Math.round(
+                    (entityOptional.get().getCpuQty() == null ? 0 : entityOptional.get().getCpuQty())
+                            * capacityReserve));
+            serverInfo.setRam((int) Math.round(
+                    (entityOptional.get().getRamCapacity() == null ? 0 : entityOptional.get().getRamCapacity())
+                            * capacityReserve));
+            serverInfo.setStorage((int) Math.round(
+                    (entityOptional.get().getHddCapacity() == null ? 0 : entityOptional.get().getHddCapacity())
+                            * capacityReserve));
         } else {
-            logger.warn("Not server template found for type: [{}]", type);
+            //logger.warn("Not server template found for type: [{}]", type);
+            throw new RuntimeException("Not server template found for type: " + type);
         }
         return serverInfo;
     }
-
-//    public List<List<VmModel>> sortVmsByDcAndType(List<VmModel> vmModelList){
-//        List<List<VmModel>> sortedVms = new ArrayList<>();
-//        Set<String> dcIdSet = vmModelList.stream().map(VmModel::getDcId).collect(Collectors.toSet());
-//    }
-
 
     private List<VmModel> getVmModelGroup(InvCapacityRequestItemEntity entity) {
         List<VmModel> vmModelList = new ArrayList<>();
@@ -156,39 +163,11 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         return vmModelList;
     }
 
-//    @Override
-//    public List<ServerModel> getServerModelList() {
-//        Date lastDate = reportHostStaticRepository.findLastDate();
-//        return toServerModelList(reportHostStaticRepository.findAllByTimestamp(lastDate));
-//    }
-
-
-//    @Override
-//    public List<String> getDcIdListAllCapacityRequestItems() {
-//        return capacityRequestItemRepository.findDcIdList();
-//    }
-//
-//    @Override
-//    public List<VmModel> getVmModelListByDcId(String dcId) {
-//        return toVmModelList(capacityRequestItemRepository.findAllByDcId(dcId));
-//    }
-
-//    @Override
-//    public List<InvCapacityRequestEntity> getInvCapacityRequestEntityList() {
-//        return capacityRequestRepository.findByOrderByDueDate();
-//    }
-
     @Override
     public List<ServerModel> getServerModelListByDcIdAndComputeType(String dcId, String computeType) {
-        Date lastDate = reportHostStaticRepository.findLastDateForDcId(dcId);
+        Date lastDate = reportHostStaticRepository.findLastDate();
         return toServerModelList(reportHostStaticRepository.findAllByDcIdAndHostTypeAndTimestamp(dcId, computeType, lastDate));
     }
-
-//    @Override
-//    public List<ServerModel> getServerModelListByDcId(String dcId) {
-//        Date lastDate = reportHostStaticRepository.findLastDateForDcId(dcId);
-//        return toServerModelList(reportHostStaticRepository.findAllByDcIdAndTimestamp(dcId, lastDate));
-//    }
 
     public List<ServerModel> toServerModelList(List<ReportHostStatic> entityList) {
         List<ServerModel> serverModelList = new ArrayList<>();
@@ -207,6 +186,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         model.setAntiAffinityGroup(entity.getAntiAffinityGroup());
         model.setVcpuQty(countVcpuQty(entity));
         model.setRamQty(countRamQty(entity));
+        model.setStorageQty(countStorageQty(entity));
         model.setDedicatedCompute(entity.getDedicatedCompute() != null && entity.getDedicatedCompute().contains("YES"));
         model.setComputeType(entity.getComputeType());
 
@@ -240,6 +220,11 @@ public class DataPreparationServiceImpl implements DataPreparationService {
             return (entity.getRamQty() == null ? 0 : entity.getRamQty())
                     * (entity.getVmQty() == null ? 0 : entity.getVmQty());
         }
+    }
+
+    private int countStorageQty(InvCapacityRequestItemEntity entity) {
+        return (entity.getLocalStorageQty() == null ? 0 : entity.getLocalStorageQty())
+                * (entity.getVmQty() == null ? 0 : entity.getVmQty());
     }
 
     public ServerModel toServerModel(ReportHostStatic entity) {
@@ -295,7 +280,45 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         return serverModelList;
     }
 
-    public Date formatDate(Date date, int addDays){
+    @Override
+    public Double getStorageExpansionRequest(Date dueDate, String dcId, String type) {
+        List<InvExpansionRequestItemEntity> expansionRequestItemEntityList = expansionRequestItemRepository.findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_InvDCAndHostType(
+                dueDate,
+                dcId,
+                type);
+        double storageExpansionRequest = 0;
+        for (InvExpansionRequestItemEntity entity : expansionRequestItemEntityList) {
+            storageExpansionRequest = storageExpansionRequest
+                    + (entity.getQuantity() == null ? 0 : entity.getQuantity())
+                    * (entity.getHddCapacity() == null ? 0 : entity.getHddCapacity());
+        }
+        return storageExpansionRequest;
+    }
+
+    @Override
+    public Double getStorageServers(String dcId, String type) {
+        String typeServer = type;
+        if (type.equals("STORAGE_SSD")) {
+            typeServer = "SSD";
+        } else if (type.equals("STORAGE_SAS")) {
+            typeServer = "SAS";
+        }
+        Date date = reportStorageStaticRepository.findLastDateForDcId(dcId);
+        List<ReportStorageStatic> reportStorageStaticsList = reportStorageStaticRepository.findAllByDcIdAndPoolTypeAndTimestamp(
+                dcId,
+                typeServer,
+                date);
+        double storageServers = 0;
+        for (ReportStorageStatic entity : reportStorageStaticsList) {
+            storageServers = storageServers +
+                    (entity.getPoolTotal() == null && entity.getUsed() == null ? 0
+                            : (entity.getPoolTotal() * capacityReserve) - entity.getUsed());
+
+        }
+        return Math.round(storageServers * 100) / 100D;
+    }
+
+    public Date formatDate(Date date, int addDays) {
         Date newDate = date;
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         Calendar c = Calendar.getInstance();
