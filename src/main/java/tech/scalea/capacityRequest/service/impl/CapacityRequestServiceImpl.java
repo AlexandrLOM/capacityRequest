@@ -31,9 +31,13 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
 
     private DataPreparationService dataPreparationService;
 
+    private AllocationSolution unsolvedCapacityRequestInf;
+
     @Autowired
-    public CapacityRequestServiceImpl(DataPreparationService dataPreparationService) {
+    public CapacityRequestServiceImpl(DataPreparationService dataPreparationService,
+                                      AllocationSolution allocationSolution) {
         this.dataPreparationService = dataPreparationService;
+        this.unsolvedCapacityRequestInf = allocationSolution;
     }
 
     @Override
@@ -51,7 +55,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         for (String dcId : dcIdSet) {
             if (dcId == null) {
                 //logger.warn("For some VMs DcId is not specified. Skip them...");
-                throw new RuntimeException("For some VMs DcId is not specified!");
+                throw new IllegalArgumentException("For some VMs DcId is not specified!");
             }
             List<VmModel> vmModelListByDcId = calculationData.getVmModelList().stream()
                     .filter(vmModel -> dcId.equals(vmModel.getDcId()))
@@ -61,19 +65,12 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
             for (String type : typeSet) {
                 if (type == null) {
                     //ogger.warn("For some VMs type is not specified. Skip them...");
-                    throw new RuntimeException("For some VMs type is not specified!");
+                    throw new IllegalArgumentException("For some VMs type is not specified!");
 
-                } else if (type.equals("STORAGE_SSD")) {
+                } else if (type.equals("STORAGE_SSD") || type.equals("STORAGE_SAS")) {
 
-                    ServerInfo serverInfo = calculateStorage(vmModelListByDcId, type, dcId, calculationData.getDueDate());
-                    if(serverInfo != null){
-                        response.getSererList().add(serverInfo);
-                    }
-
-                } else if (type.equals("STORAGE_SAS")) {
-
-                    ServerInfo serverInfo = calculateStorage(vmModelListByDcId, type, dcId, calculationData.getDueDate());
-                    if(serverInfo != null){
+                    ServerInfo serverInfo = calculateStorage(vmModelListByDcId, type, dcId, calculationData.getDueDate(), calculationData.getFromDate());
+                    if (serverInfo != null) {
                         response.getSererList().add(serverInfo);
                     }
 
@@ -85,6 +82,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
                     List<ServerModel> serverModelList = dataPreparationService.getServerModelListByDcIdAndComputeType(dcId, type);
                     List<ServerModel> serverModeExpansionlList = dataPreparationService.getServerModelExpansionRequestByDueDateAndDcIdAndHostType(
                             calculationData.getDueDate(),
+                            calculationData.getFromDate(),
                             dcId,
                             type);
                     serverModelList.addAll(serverModeExpansionlList);
@@ -99,7 +97,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         return response;
     }
 
-    private ServerInfo getResourceShortageInformation(List<ServerModel> serverModelList, List<VmModel> vmModelList, String dcId, String type) {
+    public ServerInfo getResourceShortageInformation(List<ServerModel> serverModelList, List<VmModel> vmModelList, String dcId, String type) {
         ServerInfo serverInfo = dataPreparationService.getServerInfoFromTemplate(type);
         serverInfo.setDcId(dcId);
         serverInfo.setDedicatedExceededQuantity(0);
@@ -114,7 +112,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
 
         while (hardScore != 0) {
             if (newServerModelList.size() + serverModelList.size() > vmModelList.size()) {
-                throw new RuntimeException("No solution for input data!" +
+                throw new IllegalArgumentException("No solution for input data!" +
                         "\n" + newServerModelList +
                         "\n" + vmModelList);
             }
@@ -136,7 +134,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         return serverInfo;
     }
 
-    private List<ServerModel> getNewServerModelList(ServerInfo serverInfo, Integer numberOfServers) {
+    public List<ServerModel> getNewServerModelList(ServerInfo serverInfo, Integer numberOfServers) {
         return getNewServerModelList(serverInfo.getDcId(),
                 serverInfo.getType(),
                 serverInfo.getVCpu(),
@@ -144,7 +142,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
                 numberOfServers);
     }
 
-    private List<ServerModel> getNewServerModelList(String dcId, String type, Integer vCpu, Integer ram, Integer numberOfServers) {
+    public List<ServerModel> getNewServerModelList(String dcId, String type, Integer vCpu, Integer ram, Integer numberOfServers) {
         List<ServerModel> serverModelList = new ArrayList<>();
         int i = numberOfServers;
         while (i > 0) {
@@ -165,7 +163,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         return serverModelList;
     }
 
-    private ServerInfo analysisAllocationSolution(AllocationSolution allocationSolution, ServerInfo serverInfo) {
+    public ServerInfo analysisAllocationSolution(AllocationSolution allocationSolution, ServerInfo serverInfo) {
         List<VmModel> resultVmList = new ArrayList<>();
         resultVmList.addAll(allocationSolution.getVmModelList());
 
@@ -212,7 +210,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
 
     }
 
-    private ResultVcpuAndRam calculateRequiredNumberOfServers(List<VmModel> resultList, Integer vCpu, Integer ram) {
+    public ResultVcpuAndRam calculateRequiredNumberOfServers(List<VmModel> resultList, Integer vCpu, Integer ram) {
         int allVCpu = 0;
         int allRam = 0;
         Set<ServerModel> serverModelSet = resultList.stream().map(VmModel::getServerModel).collect(Collectors.toSet());
@@ -242,7 +240,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         SolverFactory<AllocationSolution> solverFactory = SolverFactory.createFromXmlResource("allocationSolutionSolverConfig.xml");
         Solver<AllocationSolution> solver = solverFactory.buildSolver();
 
-        AllocationSolution unsolvedCapacityRequestInf = new AllocationSolution();
+        //AllocationSolution unsolvedCapacityRequestInf = new AllocationSolution();
         unsolvedCapacityRequestInf.setServerModelList(serverModelList);
         unsolvedCapacityRequestInf.setVmModelList(vmModelList);
 
@@ -327,16 +325,16 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
         return alert;
     }
 
-    public ServerInfo calculateStorage(List<VmModel> vmModelList, String type, String dcId, Date dueDate) {
+    public ServerInfo calculateStorage(List<VmModel> vmModelList, String type, String dcId, Date dueDate, Date fromDate) {
         List<VmModel> vmModelListByDcIdAndType = vmModelList.stream()
                 .filter(vmModel -> type.equals(vmModel.getComputeType()))
                 .collect(Collectors.toList());
         Double storageCapacityRequest = vmModelListByDcIdAndType.stream().mapToInt(VmModel::getStorageQty).sum() / 1000D;
-        Double storageExpansionRequest = dataPreparationService.getStorageExpansionRequest(dueDate, dcId, type);
+        Double storageExpansionRequest = dataPreparationService.getStorageExpansionRequest(dueDate, fromDate, dcId, type);
         Double storageServers = dataPreparationService.getStorageServers(dcId, type);
         Double storageTotal = (storageServers == null ? 0 : storageServers) + (storageExpansionRequest == null ? 0 : storageExpansionRequest);
 
-        Double resultStorage = Math.round((storageTotal - storageCapacityRequest) * 100) / 100D;
+        Double resultStorage = Math.round((storageTotal - storageCapacityRequest) * 10000) / 10000D;
         logger.info("Got allocationSolution for DC_id: {}, type: {}, total storage: {}({}), need storage: {}, result storage: {}",
                 dcId,
                 type,
@@ -349,7 +347,7 @@ public class CapacityRequestServiceImpl implements CapacityRequestService {
             ServerInfo serverInfo = dataPreparationService.getServerInfoFromTemplate(type);
             serverInfo.setDcId(dcId);
             if (serverInfo.getStorage() == 0) {
-                throw new RuntimeException("Server store options not found for " + type + ": " + serverInfo.getStorage());
+                throw new IllegalArgumentException("Server store options not found for " + type + ": " + serverInfo.getStorage());
             }
             serverInfo.setStorageExceededQuantity((int) Math.ceil(
                     Math.abs(resultStorage)

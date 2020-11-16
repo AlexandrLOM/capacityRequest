@@ -11,6 +11,6 @@ import java.util.UUID;
 @Repository
 public interface ExpansionRequestItemRepository extends JpaRepository<InvExpansionRequestItemEntity, UUID> {
 
-    List<InvExpansionRequestItemEntity> findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_InvDCAndHostType(Date date, String dcId, String hostType);
+    List<InvExpansionRequestItemEntity> findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_DueDateAfterAndInvExpansionRequestEntity_InvDCAndHostType(Date dueDate, Date fromDate, String dcId, String hostType);
 
 }

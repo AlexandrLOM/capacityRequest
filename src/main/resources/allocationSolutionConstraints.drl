@@ -61,7 +61,7 @@ global HardSoftScoreHolder scoreHolder;
         VmModel($vmName : vmName, $serverModel : serverModel, $antiAffinityGroup : antiAffinityGroup)
         VmModel(vmName != $vmName, serverModel == $serverModel, antiAffinityGroup == $antiAffinityGroup)
      then
-        scoreHolder.addHardConstraintMatch(kcontext, - 10000);
+        scoreHolder.addHardConstraintMatch(kcontext, - 100000);
  end
 
  rule "dedicatedConsistency"
@@ -70,7 +70,7 @@ global HardSoftScoreHolder scoreHolder;
         VmModel($vmName : vmName, serverModel == $serverModel, dedicatedCompute == true)
         VmModel(vmName != $vmName, serverModel == $serverModel)
      then
-         scoreHolder.addHardConstraintMatch(kcontext, - 100000);
+         scoreHolder.addHardConstraintMatch(kcontext, - 10000000);
  end
 
  rule "dedicatedConsistency2"
@@ -78,7 +78,7 @@ global HardSoftScoreHolder scoreHolder;
         $serverModel : ServerModel(vmCount > 0)
         VmModel($vmName : vmName, serverModel == $serverModel, dedicatedCompute == true)
       then
-         scoreHolder.addHardConstraintMatch(kcontext, - 10000);
+         scoreHolder.addHardConstraintMatch(kcontext, - 10000000);
   end
 
 

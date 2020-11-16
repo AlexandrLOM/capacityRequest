@@ -10,6 +10,7 @@ import java.util.List;
 public class CalculationData {
 
     private Date dueDate;
+    private Date fromDate;
     private List<InvCapacityRequestEntity> invCapacityRequestEntityList;
     private List<VmModel> vmModelList;
 }

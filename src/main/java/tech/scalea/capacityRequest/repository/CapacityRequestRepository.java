@@ -13,6 +13,6 @@ public interface CapacityRequestRepository extends JpaRepository<InvCapacityRequ
 
     List<InvCapacityRequestEntity> findByOrderByDueDate();
 
-    List<InvCapacityRequestEntity> findAllByDueDateBefore(Date dueDate);
+    List<InvCapacityRequestEntity> findAllByDueDateBeforeAndDueDateAfter(Date dueDate, Date nowDate);
 
 }

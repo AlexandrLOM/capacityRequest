@@ -20,9 +20,9 @@ public interface DataPreparationService {
 
     ServerInfo getServerInfoFromTemplate(String type);
 
-    List<ServerModel> getServerModelExpansionRequestByDueDateAndDcIdAndHostType(Date dueDate, String dcId, String hostType);
+    List<ServerModel> getServerModelExpansionRequestByDueDateAndDcIdAndHostType(Date dueDate, Date fromDate, String dcId, String hostType);
 
-    Double getStorageExpansionRequest(Date dueDate, String dcId, String type);
+    Double getStorageExpansionRequest(Date dueDate, Date fromDate, String dcId, String type);
 
     Double getStorageServers(String dcId, String type);
 }

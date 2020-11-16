@@ -84,26 +84,23 @@ public class DataPreparationServiceImpl implements DataPreparationService {
             return data;
         }
 
-//        Date dueDate = invCapacityRequestEntityOptional.get().getDueDate();
-//        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-//        Calendar c = Calendar.getInstance();
-//                c.setTime(sdf.parse(sdf.format(dueDate)));
-//        c.add(Calendar.DATE, 1);
-//        dueDate = c.getTime();
+        Date dueDate = formatDate(invCapacityRequestEntityOptional.get().getDueDate(), 1);
+        Date fromDate = formatDate(new Date(), 0);
 
-        data.setDueDate(invCapacityRequestEntityOptional.get().getDueDate());
+        data.setDueDate(dueDate);
+        data.setFromDate(fromDate);
         data.getInvCapacityRequestEntityList().add(invCapacityRequestEntityOptional.get());
         logger.info("Capacity request Id [{}], due date: {}",
                 id,
-                invCapacityRequestEntityOptional.get().getDueDate());
+                dueDate);
 
         data.getVmModelList().addAll(getVmModelListByCapacityRequestId(invCapacityRequestEntityOptional.get().getId()));
         logger.debug("Capacity request Id [{}], VMs: {}",
                 invCapacityRequestEntityOptional.get().getId(),
                 data.getVmModelList().size());
 
-        List<InvCapacityRequestEntity> invCapacityRequestEntityList = capacityRequestRepository.findAllByDueDateBefore(
-                invCapacityRequestEntityOptional.get().getDueDate());
+        List<InvCapacityRequestEntity> invCapacityRequestEntityList = capacityRequestRepository.findAllByDueDateBeforeAndDueDateAfter(
+                dueDate, fromDate);
 
         for (InvCapacityRequestEntity capacityRequestEntity : invCapacityRequestEntityList) {
             data.getInvCapacityRequestEntityList().add(capacityRequestEntity);
@@ -148,7 +145,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
                             * capacityReserve));
         } else {
             //logger.warn("Not server template found for type: [{}]", type);
-            throw new RuntimeException("Not server template found for type: " + type);
+            throw new IllegalArgumentException("Not server template found for type: " + type);
         }
         return serverInfo;
     }
@@ -254,10 +251,11 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     }
 
     @Override
-    public List<ServerModel> getServerModelExpansionRequestByDueDateAndDcIdAndHostType(Date dueDate, String dcId, String hostType) {
+    public List<ServerModel> getServerModelExpansionRequestByDueDateAndDcIdAndHostType(Date dueDate, Date fromDate, String dcId, String hostType) {
         List<InvExpansionRequestItemEntity> invExpansionRequestItemEntityList = expansionRequestItemRepository
-                .findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_InvDCAndHostType(
+                .findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_DueDateAfterAndInvExpansionRequestEntity_InvDCAndHostType(
                         dueDate,
+                        fromDate,
                         dcId,
                         hostType);
         List<ServerModel> serverModelList = new ArrayList<>();
@@ -281,9 +279,10 @@ public class DataPreparationServiceImpl implements DataPreparationService {
     }
 
     @Override
-    public Double getStorageExpansionRequest(Date dueDate, String dcId, String type) {
-        List<InvExpansionRequestItemEntity> expansionRequestItemEntityList = expansionRequestItemRepository.findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_InvDCAndHostType(
+    public Double getStorageExpansionRequest(Date dueDate, Date fromDate, String dcId, String type) {
+        List<InvExpansionRequestItemEntity> expansionRequestItemEntityList = expansionRequestItemRepository.findAllByInvExpansionRequestEntity_DueDateBeforeAndInvExpansionRequestEntity_DueDateAfterAndInvExpansionRequestEntity_InvDCAndHostType(
                 dueDate,
+                fromDate,
                 dcId,
                 type);
         double storageExpansionRequest = 0;
@@ -315,7 +314,7 @@ public class DataPreparationServiceImpl implements DataPreparationService {
                             : (entity.getPoolTotal() * capacityReserve) - entity.getUsed());
 
         }
-        return Math.round(storageServers * 100) / 100D;
+        return Math.round(storageServers * 10000) / 10000D;
     }
 
     public Date formatDate(Date date, int addDays) {
@@ -324,10 +323,10 @@ public class DataPreparationServiceImpl implements DataPreparationService {
         Calendar c = Calendar.getInstance();
         try {
             c.setTime(sdf.parse(sdf.format(newDate)));
-        } catch (ParseException e) {
-            logger.debug("Date conversion error: {}", date.toString());
             c.add(Calendar.DATE, addDays);
             newDate = c.getTime();
+        } catch (ParseException e) {
+            logger.debug("Date conversion error: {}", date);
         }
         return newDate;
     }
